@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Laundry Basket</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script defer src="../assets/js/scripts.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script>
+    // Authentication Guard - Immediate Execution
+    (function() {
+        const token = localStorage.getItem('lb_auth_token');
+        const role = localStorage.getItem('lb_user_role');
+        if (!token || role !== 'admin') {
+            window.location.href = 'login.html';
+        }
+    })();
+
+    function logout() {
+        localStorage.removeItem('lb_auth_token');
+        localStorage.removeItem('lb_user_role');
+        localStorage.removeItem('lb_user_name');
+        window.location.href = 'login.html';
+    }
+  </script>
+  <style>
+    .admin-container {
+      padding: 100px 0 60px;
+      min-height: 90vh;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .admin-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1px;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      border: none;
+      background: none;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn.active {
+      color: var(--brand);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--brand);
+      border-radius: 99px;
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .admin-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    .admin-stat-card {
+      background: white;
+      padding: 32px;
+      border-radius: 24px;
+      box-shadow: 0 10px 40px rgba(15, 46, 87, 0.05);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .stat-icon-box {
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .stat-info h4 {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0 0 4px;
+    }
+
+    .stat-info span {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--brand-dark);
+    }
+
+    .glass-section {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 28px;
+      padding: 32px;
+      box-shadow: 0 10px 40px rgba(15, 46, 87, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      padding: 16px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .action-link {
+      color: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .rate-edit-input {
+      border: 1px solid var(--border);
+      padding: 8px;
+      border-radius: 8px;
+      width: 80px;
+      font-family: inherit;
+      font-weight: 700;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+      /* Action Button Styling */
+      .action-btn-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .mini-btn {
+        padding: 8px 14px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
+
+      .mini-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      }
+
+      .mini-btn:active { transform: scale(0.95); }
+
+      .btn-edit { background: #eff6ff; color: #1d4ed8; }
+      .btn-edit:hover { background: #1d4ed8; color: white; }
+
+      .btn-approve { background: #f0fdf4; color: #15803d; }
+      .btn-approve:hover { background: #15803d; color: white; }
+
+      .btn-revoke { background: #fff7ed; color: #c2410c; }
+      .btn-revoke:hover { background: #c2410c; color: white; }
+
+      .btn-delete { background: #fef2f2; color: #dc2626; }
+      .btn-delete:hover { background: #dc2626; color: white; }
+    </style>
+</head>
+
+<body>
+  <div id="site-header"></div>
+
+  <div class="container admin-container">
+    <div class="admin-header">
+      <div>
+        <h1 class="section-title" style="margin: 0;">Admin <span>Portal</span></h1>
+        <p class="section-text" style="margin: 5px 0 0; text-align: left;">Global management and system integrity.</p>
+      </div>
+      <div style="display: flex; gap: 15px;">
+        <a href="store-manager.html" class="button button-accent">
+          <i class="fas fa-store-alt" style="margin-right: 8px;"></i> Store Manager View
+        </a>
+        <button class="button button-dark" onclick="resetSystemData()">
+          <i class="fas fa-sync" style="margin-right: 8px;"></i> Reset All Data
+        </button>
+        <button class="button" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchTab('orders')">Orders & Revenue</button>
+      <button class="tab-btn" onclick="switchTab('rates')">Rate Management</button>
+      <button class="tab-btn" onclick="switchTab('stores')">Branch Settings</button>
+    </div>
+
+    <!-- Tab: Orders -->
+    <div id="tab-orders" class="tab-content active">
+      <div class="admin-stats">
+        <div class="admin-stat-card">
+          <div class="stat-icon-box" style="background: #eff6ff; color: #3b82f6;">
+            <i class="fas fa-shopping-basket"></i>
+          </div>
+          <div class="stat-info">
+            <h4>Total Orders</h4>
+            <span id="stat-total-orders">0</span>
+          </div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="stat-icon-box" style="background: #f0fdf4; color: #22c55e;">
+            <i class="fas fa-rupee-sign"></i>
+          </div>
+          <div class="stat-info">
+            <h4>Global Revenue</h4>
+            <span id="stat-revenue">₹0</span>
+          </div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="stat-icon-box" style="background: #fff7ed; color: #f97316;">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-info">
+            <h4>Active Pickups</h4>
+            <span id="stat-pending">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <h3 class="premium-title" style="margin: 0; font-size: 1.3rem;">Master Order Log</h3>
+          <div style="display: flex; gap: 10px;">
+            <label for="excel-import" class="action-link" style="padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px;">
+                <i class="fas fa-file-import"></i> Import Excel
+            </label>
+            <input type="file" id="excel-import" style="display: none;" accept=".xlsx, .xls, .csv" onchange="importExcel(this)">
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th>Timestamp</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="bookings-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Rates -->
+    <div id="tab-rates" class="tab-content">
+      <div class="glass-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <h3 class="premium-title" style="margin: 0; font-size: 1.3rem;">Service Pricing Matrix</h3>
+          <button class="button button-accent" style="padding: 8px 16px; font-size: 0.85rem;" onclick="saveRates()">
+            <i class="fas fa-save"></i> Save Changes
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Item Name</th>
+                <th>Price (₹)</th>
+              </tr>
+            </thead>
+            <tbody id="rates-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Stores -->
+    <div id="tab-stores" class="tab-content">
+      <div class="glass-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <h3 class="premium-title" style="margin: 0; font-size: 1.3rem;">Branch & Manager Control</h3>
+          <button class="button button-accent" onclick="openAddStoreModal()">
+            <i class="fas fa-plus"></i> Add New Store
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Store ID</th>
+                <th>Store Name</th>
+                <th>Manager User</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="stores-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Store Modal -->
+  <div id="store-modal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="glass-section" style="width: 400px; padding: 40px;">
+        <h3 id="modal-title">Add New Store</h3>
+        <div style="margin-top: 20px;">
+            <div class="form-group">
+                <label class="form-label">Store Name</label>
+                <input type="text" id="store-name" class="booking-input" style="background: white;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Store Address</label>
+                <input type="text" id="store-address" class="booking-input" placeholder="Building, Area, City" style="background: white;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Google Maps Link</label>
+                <input type="url" id="store-map-link" class="booking-input" placeholder="https://maps.app.goo.gl/..." style="background: white;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Manager Username</label>
+                <input type="text" id="store-user" class="booking-input" style="background: white;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Temporary Password</label>
+                <input type="password" id="store-pass" class="booking-input" style="background: white;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 30px;">
+                <button class="button button-accent" style="flex: 1;" onclick="saveStore()">Save Details</button>
+                <button class="button button-dark" onclick="document.getElementById('store-modal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div id="site-footer"></div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+
+      if (tabId === 'rates') loadRates();
+      if (tabId === 'orders') loadBookings();
+      if (tabId === 'stores') loadStores();
+    }
+
+
+    const API_BASE = 'http://localhost:5000/api';
+
+    // --- Booking Logic ---
+    async function loadBookings() {
+      try {
+          const res = await fetch(`${API_BASE}/orders`, {
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('lb_auth_token')}` }
+          });
+          
+          if (res.status === 401 || res.status === 403) {
+              logout();
+              return;
+          }
+          
+          const bookings = await res.json();
+          const tableBody = document.getElementById('bookings-table-body');
+          
+          if (bookings.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--muted);">No bookings yet.</td></tr>';
+            return;
+          }
+
+          tableBody.innerHTML = bookings.map(booking => `
+            <tr class="fade-in">
+              <td><strong>${booking.id}</strong></td>
+              <td>
+                <div style="font-weight: 700;">${booking.name}</div>
+                <div style="font-size: 0.75rem; color: var(--muted);">${booking.phone}</div>
+              </td>
+              <td><span class="status-pill" style="background: ${getStatusBg(booking.status)}; color: white;">${booking.status}</span></td>
+              <td>
+                <div style="font-weight: 600; font-size: 0.8rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${booking.itemSummary}</div>
+                <div style="font-size: 0.7rem; color: var(--muted);">${booking.services}</div>
+              </td>
+              <td><span style="font-weight: 800; color: var(--brand);">₹${booking.total || 0}</span></td>
+              <td><small>${booking.timestamp}</small></td>
+              <td>
+                <button class="action-link" onclick="deleteBooking('${booking.id}')" style="background: none; border: none; color: #ef4444;">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+          `).join('');
+      } catch (err) {
+          console.error("API Error:", err);
+      }
+    }
+
+    // --- Store Management ---
+    async function loadStores() {
+        try {
+            const res = await fetch(`${API_BASE}/stores`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('lb_auth_token')}` }
+            });
+
+            if (res.status === 401 || res.status === 403) {
+                logout();
+                return;
+            }
+
+            const stores = await res.json();
+            const tableBody = document.getElementById('stores-table-body');
+            
+            if (stores.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--muted);">No stores configured.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = stores.map(store => `
+                <tr>
+                    <td><strong>${store.id}</strong></td>
+                    <td>
+                        <div style="font-weight: 700;">${store.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--muted);">${store.address || 'Opening Soon'}</div>
+                    </td>
+                    <td><small>${store.user}</small></td>
+                    <td>
+                        <span class="status-pill" style="background: ${store.approved ? '#22c55e' : '#f97316'}; color: white;">
+                            ${store.approved ? 'Active' : 'Pending'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-btn-group">
+                            <button class="mini-btn btn-edit" onclick="openEditStoreModal('${store.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="mini-btn ${store.approved ? 'btn-revoke' : 'btn-approve'}" onclick="toggleStoreApproval('${store.id}')">
+                                <i class="fas ${store.approved ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                                ${store.approved ? 'Revoke' : 'Approve'}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (err) { console.error(err); }
+    }
+
+    let editingStoreId = null;
+
+    function openAddStoreModal() {
+        editingStoreId = null;
+        document.getElementById('modal-title').innerText = 'Add New Store';
+        document.getElementById('store-name').value = '';
+        document.getElementById('store-address').value = '';
+        document.getElementById('store-map-link').value = '';
+        document.getElementById('store-user').value = '';
+        document.getElementById('store-pass').value = '';
+        document.getElementById('store-modal').style.display = 'flex';
+    }
+
+    async function openEditStoreModal(id) {
+        const res = await fetch(`${API_BASE}/stores`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('lb_auth_token')}` }
+        });
+        const stores = await res.json();
+        const store = stores.find(s => s.id === id);
+        if (store) {
+            editingStoreId = id;
+            document.getElementById('modal-title').innerText = 'Edit Store Details';
+            document.getElementById('store-name').value = store.name;
+            document.getElementById('store-address').value = store.address || '';
+            document.getElementById('store-map-link').value = store.mapLink || '';
+            document.getElementById('store-user').value = store.user;
+            document.getElementById('store-pass').value = store.pass;
+            document.getElementById('store-modal').style.display = 'flex';
+        }
+    }
+
+    async function saveStore() {
+        // Simple implementation for demo
+        alert("Updating MongoDB database...");
+        document.getElementById('store-modal').style.display = 'none';
+        loadStores();
+    }
+
+    function getStatusBg(status) {
+      if (status === 'Pending') return '#f97316';
+      if (status === 'Completed') return '#22c55e';
+      if (status === 'Processing') return '#3b82f6';
+      return '#64748b';
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+        loadBookings();
+        runInit();
+    });
+
+    async function runInit() {
+        // Seeding Logic
+        const checkRes = await fetch(`${API_BASE}/stores`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('lb_auth_token')}` }
+        });
+        const existing = await checkRes.json();
+        
+        if (existing.length === 0) {
+            console.log("Seeding MongoDB database...");
+            const defaults = [
+                { id: 'LBST-101', name: 'Ayodhya Bypass', address: 'P no 04, Narmada Enclave, Ayodhya Nagar, Bhopal', mapLink: 'https://maps.app.goo.gl/gUD3vqYWK3sb8x3a9', user: 'admin_ayodhya', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-102', name: 'Ashoka Garden', address: 'Opening Soon', mapLink: '', user: 'admin_ashoka', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-103', name: 'Bavdiya Kalan', address: 'Opening Soon', mapLink: '', user: 'admin_bavdiya', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-104', name: 'Panchvati Lalghati', address: 'Opening Soon', mapLink: '', user: 'admin_lalghati', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-105', name: 'Rachana Nagar', address: 'Opening Soon', mapLink: '', user: 'admin_rachana', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-106', name: 'Awadh Puri', address: 'Opening Soon', mapLink: '', user: 'admin_awadh', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-107', name: 'Danish Kunj', address: 'Opening Soon', mapLink: '', user: 'admin_danish', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-108', name: 'Hoshangabad Road', address: 'Opening Soon', mapLink: '', user: 'admin_hoshangabad', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-109', name: 'Kohe Fiza', address: 'Opening Soon', mapLink: '', user: 'admin_kohefiza', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-110', name: 'AIIMS', address: 'Opening Soon', mapLink: '', user: 'admin_aiims', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-111', name: 'Bittan', address: 'Opening Soon', mapLink: '', user: 'admin_bittan', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-112', name: 'Roshnipura', address: 'Opening Soon', mapLink: '', user: 'admin_roshnipura', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-113', name: 'Karond', address: 'Opening Soon', mapLink: '', user: 'admin_karond', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-114', name: 'Airport', address: 'Opening Soon', mapLink: '', user: 'admin_airport', pass: '1234', approved: true, nextOrderId: 1 },
+                { id: 'LBST-115', name: 'Idgahills', address: 'Opening Soon', mapLink: '', user: 'admin_idgahills', pass: '1234', approved: true, nextOrderId: 1 }
+            ];
+            await fetch(`${API_BASE}/seed`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('lb_auth_token')}`
+                },
+                body: JSON.stringify(defaults)
+            });
+        }
+
+        loadBookings();
+        loadStores();
+    });
+  </script>
+</body>
+
+</html>
