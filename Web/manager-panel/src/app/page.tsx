@@ -88,6 +88,10 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
     ' L ' + (x - 30) + ' ' + (y - 17) + ' Z'
   );
 
+  const firstAov = first.amount && first.count ? Math.round(first.amount / first.count) : 0;
+  const peakAov = peak.amount && peak.count ? Math.round(peak.amount / peak.count) : 0;
+  const latestAov = latest.amount && latest.count ? Math.round(latest.amount / latest.count) : 0;
+
   const milestoneNodes = [
     {
       step: '1',
@@ -95,10 +99,12 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
       title: 'First recorded',
       amount: first.amount,
       date: first.date,
+      count: first.count || 0,
+      aov: firstAov,
       x: 125,
       y: 205,
-      textX: 78,
-      textY: 96
+      textX: 52,
+      textY: 58
     },
     {
       step: '2',
@@ -106,10 +112,12 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
       title: 'Peak collection',
       amount: peak.amount,
       date: peak.date,
+      count: peak.count || 0,
+      aov: peakAov,
       x: 560,
       y: 86,
-      textX: 430,
-      textY: 242
+      textX: 410,
+      textY: 228
     },
     {
       step: '3',
@@ -117,10 +125,12 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
       title: 'Latest day',
       amount: latest.amount,
       date: latest.date,
+      count: latest.count || 0,
+      aov: latestAov,
       x: 960,
       y: 156,
-      textX: 820,
-      textY: 242
+      textX: 810,
+      textY: 228
     }
   ];
 
@@ -220,11 +230,22 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
 
               {milestoneNodes.map(node => (
                 <g key={node.step}>
-                  <foreignObject x={node.textX} y={node.textY} width="250" height="105">
-                    <div className="px-1 select-none pointer-events-none">
-                      <div className="text-[18px] font-black leading-tight text-slate-950">{node.title}</div>
-                      <div className="mt-2 text-[13px] font-bold leading-snug text-slate-500">
-                        ₹{node.amount.toLocaleString('en-IN')} on {node.date}
+                  <foreignObject x={node.textX} y={node.textY} width="280" height="135">
+                    <div className="px-3.5 py-3 select-none pointer-events-none bg-white/75 backdrop-blur-md rounded-[22px] border border-primary/5 shadow-xl shadow-slate-200/50">
+                      <div className="text-[12px] font-black leading-none text-slate-950 flex items-center gap-1.5 mb-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                        {node.title}
+                      </div>
+                      <div className="text-[18px] font-black text-slate-900 leading-none mb-1">
+                        ₹{node.amount.toLocaleString('en-IN')}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1">
+                        <span>{node.count} orders</span>
+                        <span className="w-0.5 h-0.5 rounded-full bg-slate-400"></span>
+                        <span>₹{node.aov}/order</span>
+                      </div>
+                      <div className="text-[9px] font-bold text-slate-400">
+                        {node.date}
                       </div>
                     </div>
                   </foreignObject>
