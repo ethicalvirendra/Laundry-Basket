@@ -1746,6 +1746,12 @@ export default function ManagerPanel() {
               onClick={() => setActiveTab('earnings')}
             />
             <NavItem
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>}
+              label="Business Statistics"
+              active={activeTab === 'business-stats'}
+              onClick={() => setActiveTab('business-stats')}
+            />
+            <NavItem
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
               label="Inventory"
               active={activeTab === 'inventory'}
@@ -1949,8 +1955,6 @@ export default function ManagerPanel() {
 
           {activeTab === 'earnings' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <EarningsTrendGraph data={dailyEarningsData} />
-
               <div className="manager-section-header flex justify-between items-center mb-8">
                 <div>
                   <h3 className="text-4xl font-black tracking-tight">Order History</h3>
@@ -2279,6 +2283,16 @@ export default function ManagerPanel() {
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {activeTab === 'business-stats' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="manager-section-header mb-8">
+                <h3 className="text-4xl font-black tracking-tight">Business Statistics</h3>
+                <p className="text-text-secondary text-sm mt-1">Detailed store performance, monthly trends, and revenue insights</p>
+              </div>
+              <EarningsTrendGraph data={dailyEarningsData} />
             </div>
           )}
 
