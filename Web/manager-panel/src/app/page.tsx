@@ -1902,10 +1902,16 @@ export default function ManagerPanel() {
               onClick={() => setActiveTab('rates')}
             />
             <NavItem
-              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-              label="History & Earnings"
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+              label="Order History"
               active={activeTab === 'earnings'}
               onClick={() => setActiveTab('earnings')}
+            />
+            <NavItem
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+              label="Business Statistics"
+              active={activeTab === 'statistics'}
+              onClick={() => setActiveTab('statistics')}
             />
             <NavItem
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
@@ -1954,7 +1960,7 @@ export default function ManagerPanel() {
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-glow shadow-green-500/50"></span>
                 <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Cloud Sync Active</span>
               </div>
-              {activeTab === 'earnings' && (
+              {(activeTab === 'earnings' || activeTab === 'statistics') && (
                 <label className="glass px-6 py-4 rounded-2xl flex items-center gap-2 cursor-pointer hover:bg-white/60 transition-all">
                   <span className="text-xl">📊</span>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary">Import History (.xlsx)</span>
@@ -2109,10 +2115,14 @@ export default function ManagerPanel() {
             </div>
           )}
 
-          {activeTab === 'earnings' && (
+          {activeTab === 'statistics' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <EarningsTrendGraph data={dailyEarningsData} />
+            </div>
+          )}
 
+          {activeTab === 'earnings' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="manager-section-header flex justify-between items-center mb-8">
                 <div>
                   <h3 className="text-4xl font-black tracking-tight">Order History</h3>
