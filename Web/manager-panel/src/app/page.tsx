@@ -54,7 +54,6 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
   }, [data]);
 
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
-  const [hoveredNode, setHoveredNode] = useState<any>(null);
 
   useEffect(() => {
     if (monthsList.length > 0 && !selectedMonthKey) {
@@ -80,57 +79,6 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
   const total = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const totalOrders = filteredData.reduce((sum, item) => sum + (item.count || 0), 0);
 
-  // Compute dynamic coordinates for every daily data point in the selected month
-  const svgPoints = React.useMemo(() => {
-    if (filteredData.length === 0) return [];
-    const peakAmount = peak.amount || 1000;
-    
-    return filteredData.map((item, idx) => {
-      // Space x evenly from 100 to 1020
-      const x = filteredData.length === 1 
-        ? 560 
-        : 100 + (idx * (920 / (filteredData.length - 1)));
-      
-      // Scale y between 80 (peak amount) and 280 (zero amount)
-      const y = peakAmount === 0 
-        ? 180 
-        : 280 - ((item.amount / peakAmount) * 200);
-        
-      const aov = item.count > 0 ? Math.round(item.amount / item.count) : 0;
-      
-      return {
-        idx,
-        x,
-        y,
-        date: item.date,
-        amount: item.amount,
-        count: item.count || 0,
-        aov
-      };
-    });
-  }, [filteredData, peak]);
-
-  // Construct a smooth cubic Bezier path dynamically connecting all actual daily coordinates
-  const pathD = React.useMemo(() => {
-    if (svgPoints.length === 0) return '';
-    let d = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
-    
-    if (svgPoints.length === 2) {
-      d += ` L ${svgPoints[1].x} ${svgPoints[1].y}`;
-    } else if (svgPoints.length > 2) {
-      for (let i = 0; i < svgPoints.length - 1; i++) {
-        const p0 = svgPoints[i];
-        const p1 = svgPoints[i + 1];
-        const cpX1 = p0.x + (p1.x - p0.x) / 2;
-        const cpY1 = p0.y;
-        const cpX2 = p0.x + (p1.x - p0.x) / 2;
-        const cpY2 = p1.y;
-        d += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
-      }
-    }
-    return d;
-  }, [svgPoints]);
-
   const hexPath = (x: number, y: number) => (
     'M ' + x + ' ' + (y - 34) +
     ' L ' + (x + 30) + ' ' + (y - 17) +
@@ -140,67 +88,41 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
     ' L ' + (x - 30) + ' ' + (y - 17) + ' Z'
   );
 
-  const milestoneNodes = React.useMemo(() => {
-    if (svgPoints.length === 0) return [];
-    
-    const nodes = [];
-    const firstPt = svgPoints[0];
-    const peakPt = svgPoints.reduce((best, item) => item.amount > best.amount ? item : best, firstPt);
-    const latestPt = svgPoints[svgPoints.length - 1];
-
-    // First Recorded
-    nodes.push({
+  const milestoneNodes = [
+    {
       step: '1',
       icon: 'M7 8h10M7 12h7M6 18V6a2 2 0 0 1 2-2h8l2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z',
       title: 'First recorded',
-      amount: firstPt.amount,
-      date: firstPt.date,
-      count: firstPt.count,
-      aov: firstPt.aov,
-      x: firstPt.x,
-      y: firstPt.y,
-      textX: firstPt.x + 35,
-      textY: firstPt.y - 68
-    });
-
-    // Peak Collection (render if distinct to avoid overlaps)
-    const isPeakDistinct = peakPt.idx !== firstPt.idx && peakPt.idx !== latestPt.idx;
-    if (isPeakDistinct) {
-      nodes.push({
-        step: '2',
-        icon: 'M7 17V9M12 17V5M17 17v-6',
-        title: 'Peak collection',
-        amount: peakPt.amount,
-        date: peakPt.date,
-        count: peakPt.count,
-        aov: peakPt.aov,
-        x: peakPt.x,
-        y: peakPt.y,
-        textX: peakPt.x - 140,
-        textY: peakPt.y - 145
-      });
+      amount: first.amount,
+      date: first.date,
+      x: 125,
+      y: 205,
+      textX: 78,
+      textY: 96
+    },
+    {
+      step: '2',
+      icon: 'M7 17V9M12 17V5M17 17v-6',
+      title: 'Peak collection',
+      amount: peak.amount,
+      date: peak.date,
+      x: 560,
+      y: 86,
+      textX: 430,
+      textY: 242
+    },
+    {
+      step: '3',
+      icon: 'M7 8h10v10H7zM9 11h6M9 14h4',
+      title: 'Latest day',
+      amount: latest.amount,
+      date: latest.date,
+      x: 960,
+      y: 156,
+      textX: 820,
+      textY: 242
     }
-
-    // Latest Day
-    const isLatestDistinct = latestPt.idx !== firstPt.idx;
-    if (isLatestDistinct) {
-      nodes.push({
-        step: '3',
-        icon: 'M7 8h10v10H7zM9 11h6M9 14h4',
-        title: 'Latest day',
-        amount: latestPt.amount,
-        date: latestPt.date,
-        count: latestPt.count,
-        aov: latestPt.aov,
-        x: latestPt.x,
-        y: latestPt.y,
-        textX: latestPt.x - 305,
-        textY: latestPt.y - 68
-      });
-    }
-
-    return nodes;
-  }, [svgPoints]);
+  ];
 
   const exportMonthReport = () => {
     try {
@@ -224,36 +146,24 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
   return (
     <div className="glass-card relative mb-8 overflow-hidden border-primary/10 bg-[#f8fafc]/90 p-5 shadow-2xl shadow-slate-200/70 sm:p-8 lg:p-10">
       
-      {/* Monthly Selector Scrollbar & Export Row */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6 border-b border-primary/5 pb-4">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-          {monthsList.map(month => (
-            <button
-              key={month.key}
-              onClick={() => setSelectedMonthKey(month.key)}
-              className={`px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap border ${
-                selectedMonthKey === month.key
-                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                  : 'bg-white/70 text-text-secondary border-primary/10 hover:bg-white/90'
-              }`}
-            >
-              {month.label}
-            </button>
-          ))}
-        </div>
-        
-        {filteredData.length > 0 && (
-          <button 
-            onClick={exportMonthReport}
-            className="btn-primary flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold shadow-md shadow-primary/10 self-start sm:self-auto"
+      {/* Monthly Selector Scrollbar */}
+      <div className="flex gap-2 overflow-x-auto pb-4 pt-1 px-1 no-scrollbar mb-6 border-b border-primary/5">
+        {monthsList.map(month => (
+          <button
+            key={month.key}
+            onClick={() => setSelectedMonthKey(month.key)}
+            className={`px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap border ${
+              selectedMonthKey === month.key
+                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                : 'bg-white/70 text-text-secondary border-primary/10 hover:bg-white/90'
+            }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Export Report
+            {month.label}
           </button>
-        )}
+        ))}
       </div>
 
-      <div className="pointer-events-none absolute right-10 top-24 hidden text-[104px] font-black leading-none text-slate-900/[0.035] lg:block">
+      <div className="pointer-events-none absolute right-10 top-20 hidden text-[104px] font-black leading-none text-slate-900/[0.035] lg:block">
         {totalOrders}
       </div>
 
@@ -271,7 +181,7 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
           No earning data available for this month
         </div>
       ) : (
-        <div className="relative">
+        <>
           <div className="relative overflow-x-auto overflow-y-hidden pb-2">
             <svg viewBox={'0 0 ' + width + ' ' + height} className="min-w-[860px] overflow-visible sm:min-w-0 sm:w-full" aria-label="Earnings process graph">
               <defs>
@@ -285,26 +195,22 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
                 </linearGradient>
               </defs>
 
-              {/* Dynamic Bezier curved line drawn based on actual daily data points */}
-              {pathD && (
-                <>
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="#0f172a"
-                    strokeOpacity="0.045"
-                    strokeWidth="14"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="url(#processLine)"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                  />
-                </>
-              )}
+              {/* Curvy background curve */}
+              <path
+                d="M 50 188 C 160 230, 285 236, 390 168 C 470 116, 477 50, 560 86 C 690 140, 650 236, 790 205 C 875 186, 875 120, 960 156 C 1015 180, 1038 122, 1080 140"
+                fill="none"
+                stroke="#0f172a"
+                strokeOpacity="0.045"
+                strokeWidth="14"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 50 188 C 160 230, 285 236, 390 168 C 470 116, 477 50, 560 86 C 690 140, 650 236, 790 205 C 875 186, 875 120, 960 156 C 1015 180, 1038 122, 1080 140"
+                fill="none"
+                stroke="url(#processLine)"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
 
               {/* Elegant large milestone numbers in background */}
               <text x="210" y="270" textAnchor="middle" className="fill-slate-900/[0.015] text-[180px] font-black pointer-events-none select-none">1</text>
@@ -312,62 +218,13 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
               <text x="910" y="200" textAnchor="middle" className="fill-slate-900/[0.02] text-[180px] font-black pointer-events-none select-none">3</text>
               <text x="1060" y="110" textAnchor="middle" className="fill-slate-900/[0.02] text-[160px] font-black pointer-events-none select-none">56</text>
 
-              {/* Dynamic daily circle nodes plotted along the Bezier line */}
-              {svgPoints.map((point, idx) => {
-                const isMilestone = idx === 0 || 
-                                    (idx === svgPoints.reduce((best, item, i) => item.amount > svgPoints[best].amount ? i : best, 0) && svgPoints.length >= 3) || 
-                                    (idx === svgPoints.length - 1 && svgPoints.length >= 2);
-                
-                return (
-                  <g key={idx}>
-                    {/* Large invisible circle acting as hover catcher */}
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r={20}
-                      fill="transparent"
-                      className="cursor-pointer"
-                      onMouseEnter={() => setHoveredNode(point)}
-                      onMouseLeave={() => setHoveredNode(null)}
-                    />
-                    
-                    {/* Render a small glowing dot if it's not a major milestone hexagon */}
-                    {!isMilestone && (
-                      <circle
-                        cx={point.x}
-                        cy={point.y}
-                        r={6}
-                        fill="#ffffff"
-                        stroke="#0ea5e9"
-                        strokeWidth={3}
-                        className={`pointer-events-none transition-all duration-300 ${
-                          hoveredNode?.idx === idx ? 'scale-[1.5]' : ''
-                        }`}
-                      />
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* Milestone Hexagon Overlay Nodes */}
               {milestoneNodes.map(node => (
                 <g key={node.step}>
-                  <foreignObject x={node.textX} y={node.textY} width="280" height="135">
-                    <div className="px-3.5 py-3 select-none pointer-events-none bg-white/80 backdrop-blur-md rounded-[22px] border border-primary/5 shadow-xl shadow-slate-200/50">
-                      <div className="text-[12px] font-black leading-none text-slate-950 flex items-center gap-1.5 mb-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
-                        {node.title}
-                      </div>
-                      <div className="text-[18px] font-black text-slate-900 leading-none mb-1">
-                        ₹{node.amount.toLocaleString('en-IN')}
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] font-black text-slate-500 uppercase tracking-tight mb-1">
-                        <span>{node.count} orders</span>
-                        <span className="w-0.5 h-0.5 rounded-full bg-slate-400"></span>
-                        <span>₹{node.aov}/order</span>
-                      </div>
-                      <div className="text-[9px] font-bold text-slate-400">
-                        {node.date}
+                  <foreignObject x={node.textX} y={node.textY} width="250" height="105">
+                    <div className="px-1 select-none pointer-events-none">
+                      <div className="text-[18px] font-black leading-tight text-slate-950">{node.title}</div>
+                      <div className="mt-2 text-[13px] font-bold leading-snug text-slate-500">
+                        ₹{node.amount.toLocaleString('en-IN')} on {node.date}
                       </div>
                     </div>
                   </foreignObject>
@@ -387,71 +244,52 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
             </svg>
           </div>
 
-          {/* Floating Interactive Day Details Card */}
-          {hoveredNode && (
-            <div 
-              className="absolute z-30 pointer-events-none select-none bg-white/95 backdrop-blur-md rounded-[22px] border border-primary/10 shadow-2xl p-4 transition-all duration-200 animate-in fade-in zoom-in-95"
-              style={{ 
-                left: `${hoveredNode.x - 110}px`, 
-                top: `${hoveredNode.y - 135}px`,
-                width: '220px'
-              }}
-            >
-              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                Daily Revenue Details
-              </div>
-              <div className="text-[17px] font-black text-slate-900 leading-none mb-1">
-                ₹{hoveredNode.amount.toLocaleString('en-IN')}
-              </div>
-              <div className="text-[11px] font-black text-slate-600 mb-2">
-                {hoveredNode.count} orders
-              </div>
-              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 border-t border-slate-100 pt-1.5">
-                <span>AOV: ₹{hoveredNode.aov.toLocaleString('en-IN')}/order</span>
-                <span>{hoveredNode.date}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Scrollable, Minimalist Daily Breakdown Ledger */}
-          <div className="mt-8 pt-6 border-t border-slate-200/60">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+          {/* Detail-Oriented Daily Breakdown Ledger */}
+          <div className="mt-8 pt-6 border-t border-primary/10">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-5">
               <div>
-                <h4 className="text-md font-black tracking-tight text-text-primary">Daily Earning Ledger</h4>
-                <p className="text-[11px] font-bold text-text-secondary uppercase tracking-wider mt-0.5">Performance index per calendar date</p>
+                <h4 className="text-lg font-black tracking-tight text-text-primary">Daily Breakdown Ledger</h4>
+                <p className="text-xs text-text-secondary">Detailed daily revenue, order volume, and dynamic performance metrics</p>
               </div>
+              <button 
+                onClick={exportMonthReport}
+                className="btn-primary flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold shadow-md shadow-primary/10 self-start sm:self-auto"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Export Month Report
+              </button>
             </div>
 
-            <div className="max-h-[220px] overflow-y-auto rounded-2xl border border-black/5 bg-white/30 backdrop-blur-md no-scrollbar">
+            <div className="max-h-[300px] overflow-y-auto rounded-3xl border border-primary/10 bg-white/50 scrollbar-thin">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-100/50 border-b border-black/5 text-[9px] font-black uppercase text-slate-500 tracking-wider select-none">
-                    <th className="px-5 py-3">Date</th>
-                    <th className="px-5 py-3">Daily Revenue</th>
-                    <th className="px-5 py-3 text-center">Orders Volume</th>
-                    <th className="px-5 py-3 text-right">Average Order Value</th>
+                  <tr className="bg-slate-50/70 border-b border-primary/10 text-[10px] font-black uppercase text-slate-500 tracking-wider select-none">
+                    <th className="p-4">Date</th>
+                    <th className="p-4">Daily Revenue</th>
+                    <th className="p-4 text-center">Orders Volume</th>
+                    <th className="p-4 text-right">Average Order Value</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.03]">
+                <tbody className="divide-y divide-primary/5">
                   {filteredData.slice().reverse().map((item, idx) => {
                     const aov = item.count > 0 ? (item.amount / item.count).toFixed(0) : '0';
                     const pctOfPeak = peak.amount > 0 ? (item.amount / peak.amount) * 100 : 0;
                     return (
-                      <tr key={idx} className="text-xs hover:bg-white/60 transition-all font-bold text-text-primary">
-                        <td className="px-5 py-3 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                      <tr key={idx} className="text-xs hover:bg-white/80 transition-all font-bold text-text-primary">
+                        <td className="p-4 flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400/80 animate-pulse"></span>
                           {item.date}
                         </td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-extrabold">₹{item.amount.toLocaleString('en-IN')}</span>
-                            <div className="w-20 h-1 rounded-full bg-slate-200/50 overflow-hidden hidden sm:block">
-                              <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${pctOfPeak}%` }}></div>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <span className="w-16 font-extrabold">₹{item.amount.toLocaleString('en-IN')}</span>
+                            <div className="w-28 h-1.5 rounded-full bg-slate-100/80 overflow-hidden hidden sm:block">
+                              <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${pctOfPeak}%` }}></div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-center text-primary font-black">{item.count} orders</td>
-                        <td className="px-5 py-3 text-right text-text-secondary font-semibold">₹{Number(aov).toLocaleString('en-IN')} / order</td>
+                        <td className="p-4 text-center text-primary font-black">{item.count} orders</td>
+                        <td className="p-4 text-right text-text-secondary font-semibold">₹{Number(aov).toLocaleString('en-IN')} / order</td>
                       </tr>
                     );
                   })}
@@ -459,7 +297,7 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
               </table>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -857,7 +695,7 @@ export default function ManagerPanel() {
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('lb_auth_token');
-      const res = await fetch(`${API_BASE}/orders/store/${storeId}?fast=1&limit=200`, {
+      const res = await fetch(`${API_BASE}/orders/store/${storeId}?fast=1&limit=10000`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) { localStorage.clear(); window.location.href = '/manager/login'; return; }
@@ -1902,16 +1740,10 @@ export default function ManagerPanel() {
               onClick={() => setActiveTab('rates')}
             />
             <NavItem
-              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              label="Order History"
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+              label="History & Earnings"
               active={activeTab === 'earnings'}
               onClick={() => setActiveTab('earnings')}
-            />
-            <NavItem
-              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-              label="Business Statistics"
-              active={activeTab === 'statistics'}
-              onClick={() => setActiveTab('statistics')}
             />
             <NavItem
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
@@ -1960,7 +1792,7 @@ export default function ManagerPanel() {
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-glow shadow-green-500/50"></span>
                 <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Cloud Sync Active</span>
               </div>
-              {(activeTab === 'earnings' || activeTab === 'statistics') && (
+              {activeTab === 'earnings' && (
                 <label className="glass px-6 py-4 rounded-2xl flex items-center gap-2 cursor-pointer hover:bg-white/60 transition-all">
                   <span className="text-xl">📊</span>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary">Import History (.xlsx)</span>
@@ -2115,14 +1947,10 @@ export default function ManagerPanel() {
             </div>
           )}
 
-          {activeTab === 'statistics' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <EarningsTrendGraph data={dailyEarningsData} />
-            </div>
-          )}
-
           {activeTab === 'earnings' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <EarningsTrendGraph data={dailyEarningsData} />
+
               <div className="manager-section-header flex justify-between items-center mb-8">
                 <div>
                   <h3 className="text-4xl font-black tracking-tight">Order History</h3>
