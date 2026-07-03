@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Sans:wght@300;400;500;600;700;800&display=swap');
+
+@theme {
+  --color-primary: #1A6FDB;
+  --color-primary-hover: #155bb5;
+  --color-background: #F0F7FF;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #64748B;
+}
+
+@import "tailwindcss";
+
+:root {
+  font-family: 'Outfit', 'Fira Sans', sans-serif;
+  color-scheme: light;
+  
+  --bg-primary: #F8FAFC;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-bg-hover: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(226, 232, 240, 0.8);
+  --glass-border-hover: rgba(26, 111, 219, 0.2);
+  --glass-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 8px -1px rgba(15, 23, 42, 0.02);
+  --glass-shadow-hover: 0 12px 30px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  
+  --accent-blue: #1A6FDB;
+  --accent-blue-gradient: linear-gradient(135deg, #1A6FDB 0%, #2563EB 100%);
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-pink: #ec4899;
+  --accent-purple: #8b5cf6;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #F8FAFC !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.4) 0px, transparent 40%),
+    radial-gradient(at 100% 0%, rgba(219, 234, 254, 0.3) 0px, transparent 40%) !important;
+  color: #0F172A !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbars - Light/Minimal */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 111, 219, 0.3);
+}
+
+/* Custom Glassmorphism Classes matching Admin Dashboard */
+.glass-panel {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(12px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  border-radius: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: var(--glass-bg-hover) !important;
+  border-color: var(--glass-border-hover) !important;
+  box-shadow: var(--glass-shadow-hover) !important;
+  transform: translateY(-2px);
+}
+
+/* Side borders for metrics matching the beautiful palette */
+.glass-card-primary {
+  border-left: 5px solid var(--accent-blue) !important;
+}
+
+.glass-card-success {
+  border-left: 5px solid var(--accent-success) !important;
+}
+
+.glass-card-warning {
+  border-left: 5px solid var(--accent-warning) !important;
+}
+
+.glass-card-pink {
+  border-left: 5px solid var(--accent-pink) !important;
+}
+
+.glass-card-purple {
+  border-left: 5px solid var(--accent-purple) !important;
+}
+
+/* Form Controls & Buttons in Light Glass */
+.glass-input {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 12px;
+  color: #0F172A !important;
+  outline: none;
+  transition: all 0.25s ease-in-out;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--accent-blue) !important;
+  box-shadow: 0 0 0 3px rgba(26, 111, 219, 0.15);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-radius: 12px;
+  color: #334155;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #0F172A;
+}
+
+.glass-button-primary {
+  background: var(--accent-blue-gradient) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 8px 20px rgba(26, 111, 219, 0.2) !important;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.glass-button-primary:hover {
+  box-shadow: 0 10px 25px rgba(26, 111, 219, 0.35) !important;
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  color: white !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Typography styles matching the clean UI */
+.stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--accent-blue) !important;
+}
+
+.font-mono {
+  font-family: 'Fira Code', monospace !important;
+}

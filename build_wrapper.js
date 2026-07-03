@@ -2,20 +2,20 @@ const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-console.log('--- Custom Hostinger Build Wrapper ---');
+console.log('--- Custom Hostinger Build Wrapper (Isolated hrms) ---');
 
 try {
   console.log('Step 1: Installing dependencies in hrms...');
   cp.execSync('npm install', { cwd: path.join(__dirname, 'hrms'), stdio: 'inherit' });
 
-  console.log('Step 2: Building hrms application...');
+  console.log('Step 2: Building Next.js hrms application...');
   cp.execSync('npm run build', { cwd: path.join(__dirname, 'hrms'), stdio: 'inherit' });
 
-  console.log('Step 3: Copying dist files to target output folder (.next)...');
-  const distPath = path.join(__dirname, 'hrms', 'dist');
+  console.log('Step 3: Copying .next folder to root output folder...');
+  const distPath = path.join(__dirname, 'hrms', '.next');
   const nextPath = path.join(__dirname, '.next');
 
-  // Recreate .next folder
+  // Recreate .next folder in root
   if (fs.existsSync(nextPath)) {
     fs.rmSync(nextPath, { recursive: true, force: true });
   }
@@ -36,7 +36,7 @@ try {
   }
 
   copyFolderSync(distPath, nextPath);
-  console.log('✓ Successfully copied files to .next folder!');
+  console.log('✓ Successfully copied .next folder to root!');
   console.log('--- Build Wrapper Finished Successfully ---');
 
 } catch (err) {

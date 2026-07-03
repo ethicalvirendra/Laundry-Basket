@@ -1,4 +1,10 @@
 {
+  "name": "laundry-basket-root",
+  "version": "1.2.1",
+  "private": true,
+  "scripts": {
+    "build": "node build_wrapper.js"
+  },
   "dependencies": {
     "archiver": "^8.0.0"
   },
@@ -6,8 +12,5 @@
     "@playwright/test": "^1.60.0",
     "jest": "^30.4.2",
     "supertest": "^7.2.2"
-  },
-  "scripts": {
-    "build": "node build_wrapper.js"
   }
 }

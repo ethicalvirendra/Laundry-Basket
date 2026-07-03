@@ -3,14 +3,14 @@ import { supabase } from './config/supabase';
 import { Lock, Mail, Key, LogIn, Shield, User, Eye, EyeOff, CheckCircle, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import DashboardOverview from './pages/DashboardOverview';
-import StaffDirectory from './pages/StaffDirectory';
-import ShiftScheduler from './pages/ShiftScheduler';
-import PayrollIncentives from './pages/PayrollIncentives';
-import LeaveApprovals from './pages/LeaveApprovals';
-import EmployeeWorkspace from './pages/EmployeeWorkspace';
-import TasksManagement from './pages/TasksManagement';
-import AttendanceManagement from './pages/AttendanceManagement';
+import DashboardOverview from './spa-pages/DashboardOverview';
+import StaffDirectory from './spa-pages/StaffDirectory';
+import ShiftScheduler from './spa-pages/ShiftScheduler';
+import PayrollIncentives from './spa-pages/PayrollIncentives';
+import LeaveApprovals from './spa-pages/LeaveApprovals';
+import EmployeeWorkspace from './spa-pages/EmployeeWorkspace';
+import TasksManagement from './spa-pages/TasksManagement';
+import AttendanceManagement from './spa-pages/AttendanceManagement';
 import logoImg from './assets/logo.png';
 
 // Lifted Database Collections (Synchronized Mock Data)
