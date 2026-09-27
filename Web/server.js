@@ -45,6 +45,184 @@ const deleteFromFirestore = async (collection, id) => {
     }
 };
 
+// --- Nodemailer SMTP Initialization ---
+const nodemailer = require('nodemailer');
+let mailTransporter = null;
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    mailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        }
+    });
+    console.log("✉️ Nodemailer SMTP Transporter configured");
+} else {
+    console.warn("⚠️ SMTP credentials not found in env. Welcome email functionality will be disabled.");
+}
+
+const sendWelcomeEmail = async (toEmail) => {
+    if (!mailTransporter) {
+        console.warn("⚠️ Cannot send welcome email: Transporter not configured.");
+        return;
+    }
+    const fromAddress = process.env.SMTP_FROM || `"Laundry Basket" <${process.env.SMTP_USER}>`;
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Laundry Basket!</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #f8fafc;
+                margin: 0;
+                padding: 0;
+                color: #334155;
+            }
+            .email-container {
+                max-width: 600px;
+                margin: 20px auto;
+                background-color: #ffffff;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+            }
+            .header {
+                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                color: #ffffff;
+                text-align: center;
+                padding: 35px 20px;
+            }
+            .header h1 {
+                margin: 0;
+                font-size: 26px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+            }
+            .content {
+                padding: 35px 25px;
+                line-height: 1.6;
+            }
+            .welcome-text {
+                font-size: 18px;
+                font-weight: 600;
+                color: #1e293b;
+                margin-top: 0;
+            }
+            .coupon-box {
+                background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                border: 2px dashed #22c55e;
+                border-radius: 8px;
+                padding: 20px;
+                text-align: center;
+                margin: 25px 0;
+            }
+            .coupon-title {
+                font-size: 14px;
+                color: #166534;
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                font-weight: 700;
+                margin: 0 0 5px 0;
+            }
+            .coupon-code {
+                font-size: 32px;
+                color: #15803d;
+                font-weight: 800;
+                letter-spacing: 2px;
+                margin: 5px 0;
+            }
+            .coupon-subtitle {
+                font-size: 13px;
+                color: #166534;
+                margin: 5px 0 0 0;
+                opacity: 0.8;
+            }
+            .btn {
+                display: inline-block;
+                background-color: #2563eb;
+                color: #ffffff !important;
+                text-decoration: none;
+                padding: 12px 30px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 15px;
+                margin: 15px 0;
+                text-align: center;
+                box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+            }
+            .btn:hover {
+                background-color: #1d4ed8;
+            }
+            .footer {
+                background-color: #f1f5f9;
+                padding: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #64748b;
+                border-top: 1px solid #e2e8f0;
+            }
+            .footer p {
+                margin: 5px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <h1>Welcome to Laundry Basket!</h1>
+            </div>
+            <div class="content">
+                <p class="welcome-text">Hi there,</p>
+                <p>Thank you for subscribing to our newsletter! We are thrilled to have you join our community of Bhopal residents who enjoy clean clothes and hassle-free laundry service.</p>
+                <p>As a warm welcome, here is your exclusive first-time subscriber discount coupon:</p>
+                
+                <div class="coupon-box">
+                    <p class="coupon-title">Your 20% Off Coupon</p>
+                    <div class="coupon-code">WELCOME20</div>
+                    <p class="coupon-subtitle">Valid on any Wash & Iron, Dry Cleaning, or Steam Iron order.</p>
+                </div>
+                
+                <p>To redeem this, simply enter the coupon code in the notes/instructions when booking your pickup online, or mention it to our representative at the time of pickup.</p>
+                
+                <div style="text-align: center;">
+                    <a href="https://laundrybasket.in" class="btn">Book a Pickup Now</a>
+                </div>
+                
+                <p style="margin-top: 25px;">If you have any questions or need support, feel free to reach out to us on WhatsApp or reply directly to this email.</p>
+                <p>Best regards,<br><strong>The Laundry Basket Team</strong></p>
+            </div>
+            <div class="footer">
+                <p><strong>Laundry Basket Bhopal</strong></p>
+                <p>Bawadiya Kalan, Bhopal, Madhya Pradesh</p>
+                <p>&copy; ${new Date().getFullYear()} Laundry Basket. All rights reserved.</p>
+                <p style="font-size: 10px; margin-top: 10px; opacity: 0.7;">You received this email because you subscribed on our website. You can unsubscribe at any time.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+    try {
+        const info = await mailTransporter.sendMail({
+            from: fromAddress,
+            to: toEmail,
+            subject: '🎉 Welcome to Laundry Basket! Get 20% Off Your First Order',
+            html: htmlContent
+        });
+        console.log(`✉️ Welcome email successfully sent to ${toEmail}. Message ID: ${info.messageId}`);
+        return info;
+    } catch (err) {
+        console.error('❌ Failed to send welcome email:', err.message);
+        throw err;
+    }
+};
+
 const app = express();
 const server = http.createServer(app);
 
@@ -153,6 +331,56 @@ app.use(express.static(__dirname)); // Serves index.html, assets, and images fro
 mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
         console.log('✅ Connected to Laundry Basket MongoDB');
+        
+        // Ensure single main store (Ayodhya Nagar Hub)
+        try {
+            await Store.deleteMany({ id: { $ne: 'LBBPL' } });
+            await Store.findOneAndUpdate(
+                { id: 'LBBPL' },
+                { 
+                    id: 'LBBPL',
+                    name: 'Ayodhya Nagar Hub',
+                    branchCode: 'LBBPL',
+                    manager: 'admin',
+                    location: '7FMC+MG8, Housing Board Colony, Ayodhya Nagar, Arhedi, Bhopal, MP 462041',
+                    mapUrl: 'https://maps.google.com/?q=7FMC%2BMG8+Ayodhya+Nagar+Bhopal',
+                    lat: 23.2766,
+                    lng: 77.4658,
+                    approved: true,
+                    status: 'Active'
+                },
+                { upsert: true, new: true }
+            );
+            console.log('🏬 Single Unified Store Initialized: Ayodhya Nagar Hub (LBBPL)');
+        } catch (err) {
+            console.error('Error enforcing single store:', err.message);
+        }
+        
+        // Archive Old Orders (Pre-15 September historical orders only; NEVER active or LB1000+ orders)
+        try {
+            // Ensure any active orders or recent LB1000+ orders are ALWAYS active and visible
+            await Order.updateMany(
+                {
+                    $or: [
+                        { id: /^LB10/i },
+                        { id: /^LBEV/i },
+                        { status: { $in: ['Pending', 'Out for Pickup', 'Pickup Done', 'Delivered at Store', 'Washing', 'Drying', 'Ironing', 'Processing', 'Ready', 'Out for Delivery'] } }
+                    ],
+                    isLegacyOrder: true
+                },
+                { $set: { isLegacyOrder: false, archivedTag: null } }
+            );
+
+            // Ensure counter sequence is at least 1009
+            const counters = await Counter.find({});
+            for (const c of counters) {
+                if (c.seq < 1009) {
+                    await Counter.updateOne({ _id: c._id }, { $set: { seq: 1009 } });
+                }
+            }
+        } catch (err) {
+            console.error('Error setting up old order history archive:', err.message);
+        }
         
         // Dynamic Excel Order Importer Trigger Check
         const fs = require('fs');
@@ -286,7 +514,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // --- Sequential ID Counter ---
 const CounterSchema = new mongoose.Schema({
     id: { type: String, required: true },
-    seq: { type: Number, default: 999 }
+    seq: { type: Number, default: 1000 }
 });
 const Counter = mongoose.model('Counter', CounterSchema);
 
@@ -334,10 +562,131 @@ const OrderSchema = new mongoose.Schema({
     total_days_aging: Number,
     pending_payment_days: Number,
     payment_risk: String,
-    cx_type: String // Smart auto-categorized: Business / Regular / Premium / Walk-in / App
+    discount: { type: Number, default: 0 },
+    subtotal: { type: Number, default: 0 },
+    distanceKm: { type: Number, default: 0 },
+    deliveryFee: { type: Number, default: 0 },
+    isLegacyOrder: { type: Boolean, default: false },
+    archivedTag: { type: String, default: null },
+    pickupPhoto: { type: String, default: null },    // base64 image string uploaded by rider at pickup
+    deliveryPhoto: { type: String, default: null },   // base64 image string uploaded by rider at delivery
+    placedBy: { type: String, default: 'Customer' },
+    pickupRiderId: { type: String, default: null },
+    pickupRiderName: { type: String, default: null },
+    deliveryRiderId: { type: String, default: null },
+    deliveryRiderName: { type: String, default: null },
+    appliedReferralCode: { type: String, default: null },
+    referralDiscount: { type: Number, default: 0 },
+    referralRewardClaimed: { type: Boolean, default: false },
+    redeemedPoints: { type: Number, default: 0 }
 });
 OrderSchema.index({ storeId: 1, _id: -1 });
+OrderSchema.index({ phone: 1 });
 const Order = mongoose.model('Order', OrderSchema);
+
+// --- Distance & Delivery Charge Calculation Logic ---
+function calculateDeliveryFee(distanceKm, subtotal = 0) {
+    const dist = parseFloat(distanceKm);
+    if (isNaN(dist) || dist < 0) return { fee: 0, distanceKm: 0, tier: 'Free (< 3 KM)' };
+
+    // Free delivery promotion for orders >= ₹500 up to 5 KM
+    if (subtotal >= 500 && dist <= 5.0) {
+        return { fee: 0, distanceKm: parseFloat(dist.toFixed(1)), tier: 'FREE (Order ≥ ₹500)' };
+    }
+
+    let fee = 0;
+    let tier = 'Free (< 3 KM)';
+
+    if (dist <= 3.0) {
+        fee = 0;
+        tier = 'Free (< 3 KM)';
+    } else if (dist <= 5.0) {
+        fee = 27;
+        tier = '3-5 KM (₹27)';
+    } else if (dist <= 8.0) {
+        fee = 47;
+        tier = '5-8 KM (₹47)';
+    } else if (dist <= 12.0) {
+        fee = 77;
+        tier = '8-12 KM (₹77)';
+    } else {
+        const extraKm = Math.ceil(dist - 12);
+        fee = 97 + (extraKm * 10);
+        tier = `> 12 KM (₹${fee})`;
+    }
+
+    return {
+        fee,
+        distanceKm: parseFloat(dist.toFixed(1)),
+        tier
+    };
+}
+
+// Helper to parse service strings
+function parseService(s) {
+    const sTrim = String(s || '').trim();
+    let name = sTrim;
+    let qty = 1;
+    let price = 0;
+    
+    let cleanStr = sTrim.replace(/^(Service|Product):\s*/i, '');
+    
+    // Format: "Service: Dry Cleaning - Shirt x2 (₹160)" or "Dry Cleaning - Shirt x2 (₹160)"
+    const matchX = cleanStr.match(/(.*?)\s+x(\d+)\s*\(₹(\d+)\)(.*)/);
+    if (matchX) {
+        const baseName = matchX[1].trim();
+        qty = parseInt(matchX[2]) || 1;
+        price = parseInt(matchX[3]) || 0;
+        name = baseName;
+    } else {
+        const matchPcs = cleanStr.match(/(.*?)\s*\((\d+)\s*pcs\)/i);
+        if (matchPcs) {
+            name = matchPcs[1].trim();
+            qty = parseInt(matchPcs[2]) || 1;
+        }
+    }
+    
+    let serviceType = name;
+    if (name.includes(' - ')) {
+        serviceType = name.split(' - ')[0].trim();
+    }
+    
+    return { name, qty, price, serviceType };
+}
+
+// Helper to attach repeat customer statistics
+async function attachRepeatCustomerFlag(orders) {
+    if (!orders || orders.length === 0) return orders;
+    
+    const phones = [...new Set(orders.map(o => o.phone).filter(Boolean))];
+    if (phones.length === 0) {
+        orders.forEach(o => {
+            o.isRepeatCustomer = false;
+            o.customerOrdersCount = 1;
+        });
+        return orders;
+    }
+    
+    const counts = await Order.aggregate([
+        { $match: { phone: { $in: phones } } },
+        { $group: { _id: "$phone", count: { $sum: 1 } } }
+    ]);
+    
+    const countMap = {};
+    counts.forEach(c => {
+        if (c._id) {
+            countMap[c._id] = c.count;
+        }
+    });
+    
+    orders.forEach(o => {
+        const count = countMap[o.phone] || 1;
+        o.customerOrdersCount = count;
+        o.isRepeatCustomer = count > 1;
+    });
+    
+    return orders;
+}
 
 // 4. Store Schema
 const StoreSchema = new mongoose.Schema({
@@ -348,11 +697,26 @@ const StoreSchema = new mongoose.Schema({
     password: { type: String }, // Plain text or hash
     location: String,
     mapUrl: String,
+    lat: { type: Number, default: 23.2766 }, // Ayodhya Nagar Hub (7FMC+MG8)
+    lng: { type: Number, default: 77.4658 },
     approved: { type: Boolean, default: true },
     status: { type: String, default: 'Active' },
-    ordersCount: { type: Number, default: 0 }
+    ordersCount: { type: Number, default: 0 },
+    googleAnalyticsId: { type: String, default: '' }
 });
 const Store = mongoose.model('Store', StoreSchema);
+
+// Campaign Schema for Tracking Push Campaigns
+const CampaignSchema = new mongoose.Schema({
+    title: String,
+    body: String,
+    targetType: String,
+    targetId: String,
+    sentCount: Number,
+    totalCount: Number,
+    timestamp: { type: String, default: () => new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) }
+});
+const Campaign = mongoose.model('Campaign', CampaignSchema);
 
 // 5. Rider Schema
 const RiderSchema = new mongoose.Schema({
@@ -428,14 +792,31 @@ const Review = mongoose.model('Review', ReviewSchema);
 
 // 9. Customer Schema
 const CustomerSchema = new mongoose.Schema({
-    phone: { type: String, unique: true, required: true },
+    phone: { type: String, unique: true, sparse: true },
+    email: { type: String, sparse: true },
+    googleId: { type: String, sparse: true },
+    authProvider: { type: String, enum: ['phone', 'google'], default: 'phone' },
     name: { type: String },
     accountType: { type: String, default: 'Residential' },
-    fcmToken: { type: String, default: null }, // For push notifications
+    fcmToken: { type: String, default: null },
     timestamp: { type: String, default: () => new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
-    profilePicture: { type: String, default: null }
+    profilePicture: { type: String, default: null },
+    address: { type: String, default: '' },
+    referralCode: { type: String, unique: true, sparse: true },
+    referredBy: { type: String, default: null },
+    walletBalance: { type: Number, default: 0 },
+    referralCount: { type: Number, default: 0 }
 });
 const Customer = mongoose.model('Customer', CustomerSchema);
+
+// 10. Subscriber Schema (Newsletter)
+const SubscriberSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    source: { type: String, default: 'website' },
+    subscribedAt: { type: Date, default: Date.now },
+    active: { type: Boolean, default: true }
+});
+const Subscriber = mongoose.model('Subscriber', SubscriberSchema);
 
 // --- RIDER DETAILS POPULATION HELPERS ---
 const populateRiderDetails = async (order) => {
@@ -611,8 +992,31 @@ app.post('/api/otp/verify', async (req, res) => {
                 await customer.save();
             }
 
-            const token = jwt.sign({ id: phone, role: 'customer', name: customer.name, accountType: customer.accountType, profilePicture: customer.profilePicture }, process.env.JWT_SECRET, { expiresIn: '24h' });
-            res.json({ token, name: customer.name, phone: cleanPhone, accountType: customer.accountType, profilePicture: customer.profilePicture, isNewUser });
+            // --- Role Detection ---
+            // Admin: phones listed in ADMIN_PHONES env var (comma-separated)
+            const adminPhones = (process.env.ADMIN_PHONES || '').split(',').map(p => p.trim()).filter(Boolean);
+            // Vendor: phones listed in VENDOR_PHONES env var (comma-separated)
+            const vendorPhones = (process.env.VENDOR_PHONES || '').split(',').map(p => p.trim()).filter(Boolean);
+            let userRole = 'customer';
+            if (adminPhones.includes(cleanPhone)) {
+                userRole = 'admin';
+            } else if (vendorPhones.includes(cleanPhone)) {
+                userRole = 'vendor';
+            }
+
+            if (!customer.referralCode) {
+                customer.referralCode = await generateUniqueReferralCode(customer);
+                await customer.save();
+            }
+
+            const token = jwt.sign({ 
+                id: cleanPhone, 
+                role: userRole, 
+                name: customer.name, 
+                accountType: customer.accountType,
+                authProvider: customer.authProvider || 'phone'
+            }, process.env.JWT_SECRET, { expiresIn: '30d' });
+            res.json({ token, role: userRole, name: customer.name, phone: cleanPhone, accountType: customer.accountType, profilePicture: customer.profilePicture, referralCode: customer.referralCode, isNewUser });
         } else {
             res.status(401).json({ error: 'Invalid OTP' });
         }
@@ -622,14 +1026,102 @@ app.post('/api/otp/verify', async (req, res) => {
     }
 });
 
+
+// AUTH: Google Sign-In
+app.post('/api/auth/google', async (req, res) => {
+    const { idToken, accessToken } = req.body;
+    if (!idToken && !accessToken) return res.status(400).json({ error: 'Token required' });
+
+    try {
+        let googleId, email, name, picture;
+
+        if (idToken) {
+            // Verify Google ID token
+            const googleRes = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+            googleId = googleRes.data.sub;
+            email = googleRes.data.email;
+            name = googleRes.data.name;
+            picture = googleRes.data.picture;
+        } else {
+            // Verify Google Access token
+            const googleRes = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`);
+            googleId = googleRes.data.sub;
+            email = googleRes.data.email;
+            name = googleRes.data.name;
+            picture = googleRes.data.picture;
+        }
+
+        if (!googleId || !email) {
+            return res.status(401).json({ error: 'Invalid Google token' });
+        }
+
+        // Find existing customer by googleId or email
+        let customer = await Customer.findOne({ $or: [{ googleId }, { email }] });
+        let isNewUser = false;
+
+        if (customer) {
+            // Update Google info if needed
+            if (!customer.googleId) customer.googleId = googleId;
+            if (!customer.email) customer.email = email;
+            if (picture && !customer.profilePicture) customer.profilePicture = picture;
+            if (name && !customer.name) customer.name = name;
+            if (!customer.referralCode) customer.referralCode = await generateUniqueReferralCode(customer);
+            await customer.save();
+        } else {
+            // New Google user — create without phone/address
+            const tempReferralCode = await generateUniqueReferralCode({ name, phone: '' });
+            customer = new Customer({
+                email,
+                googleId,
+                name: name || '',
+                authProvider: 'google',
+                profilePicture: picture || null,
+                referralCode: tempReferralCode
+            });
+            await customer.save();
+            isNewUser = true;
+        }
+
+        const jwtId = customer.phone || customer.email;
+        const token = jwt.sign({
+            id: jwtId,
+            role: 'customer',
+            name: customer.name,
+            accountType: customer.accountType,
+            authProvider: 'google'
+        }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+        res.json({
+            token,
+            name: customer.name,
+            phone: customer.phone || '',
+            email: customer.email,
+            address: customer.address || '',
+            accountType: customer.accountType,
+            profilePicture: customer.profilePicture,
+            referralCode: customer.referralCode,
+            isNewUser,
+            needsProfileSetup: !customer.phone || !customer.address || !customer.name
+        });
+    } catch (err) {
+        console.error('Google Auth Error:', err.response?.data || err.message);
+        res.status(500).json({ error: 'Google authentication failed' });
+    }
+});
+
 // GET: Customer Profile
 app.get('/api/customer/profile', verifyToken, async (req, res) => {
     if (req.user.role !== 'customer') return res.status(403).json({ error: 'Customer only' });
     try {
-        const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
-        const customer = await Customer.findOne({ phone: cleanPhone });
+        let customer;
+        if (req.user.authProvider === 'google') {
+            customer = await Customer.findOne({ $or: [{ email: req.user.id }, { phone: req.user.id.replace(/\D/g, '').slice(-10) }] });
+        } else {
+            const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
+            customer = await Customer.findOne({ phone: cleanPhone });
+        }
         if (!customer) {
-            return res.json({ phone: cleanPhone, name: req.user.name || 'Laundry Basket User', profilePicture: null, accountType: 'Residential' });
+            return res.json({ phone: '', name: req.user.name || 'Laundry Basket User', profilePicture: null, accountType: 'Residential', address: '' });
         }
         res.json(customer);
     } catch (err) {
@@ -640,12 +1132,27 @@ app.get('/api/customer/profile', verifyToken, async (req, res) => {
 // POST: Update Customer Profile
 app.post('/api/customer/profile', verifyToken, async (req, res) => {
     if (req.user.role !== 'customer') return res.status(403).json({ error: 'Customer only' });
-    const { name, accountType, profilePicture } = req.body;
+    const { name, phone, address, accountType, profilePicture } = req.body;
     try {
-        const customer = await Customer.findOne({ phone: req.user.id });
+        let customer;
+        if (req.user.authProvider === 'google') {
+            customer = await Customer.findOne({ $or: [{ email: req.user.id }, { phone: req.user.id.replace(/\D/g, '').slice(-10) }] });
+        } else {
+            const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
+            customer = await Customer.findOne({ phone: cleanPhone });
+        }
         if (!customer) return res.status(404).json({ error: 'Customer not found' });
         
         if (name) customer.name = name;
+        if (phone) {
+            const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+            const existingPhone = await Customer.findOne({ phone: cleanPhone });
+            if (existingPhone && String(existingPhone._id) !== String(customer._id)) {
+                return res.status(400).json({ error: 'Mobile number already registered to another account' });
+            }
+            customer.phone = cleanPhone;
+        }
+        if (address !== undefined) customer.address = address;
         if (accountType) customer.accountType = accountType;
         if (profilePicture !== undefined) customer.profilePicture = profilePicture;
         await customer.save();
@@ -656,10 +1163,16 @@ app.post('/api/customer/profile', verifyToken, async (req, res) => {
     }
 });
 
-// GET: All Orders (Role-based access)
+// GET: All Orders (Role-based access - Active vs Legacy Old History)
 app.get('/api/orders', verifyToken, async (req, res) => {
     try {
         let filter = {};
+        if (req.query.history === '1' || req.query.isLegacy === '1') {
+            filter.isLegacyOrder = true;
+        } else {
+            filter.isLegacyOrder = { $ne: true };
+        }
+
         if (req.user.role === 'rider') filter.assignedRiderId = req.user.id;
         else if (req.user.role === 'manager') filter.storeId = req.user.id;
         else if (req.user.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
@@ -670,24 +1183,40 @@ app.get('/api/orders', verifyToken, async (req, res) => {
         
         if (req.query.date) {
             const [year, month, day] = req.query.date.split('-');
-            const formattedDateStr = `${day}/${month}/${year}`;
-            filter.timestamp = { $regex: `^${formattedDateStr}` };
+            const dayInt = parseInt(day, 10);
+            const monthInt = parseInt(month, 10);
+            filter.timestamp = { $regex: `^0?${dayInt}/0?${monthInt}/${year}` };
         }
 
         const orders = await Order.find(filter).sort({ _id: -1 }).select('-events -__v').lean();
         const populatedOrders = await populateRidersDetails(orders);
-        return res.json(populatedOrders);
+        const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
+        return res.json(finalOrders);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// GET: Customer's own orders or Rider's assigned tasks
+// GET: Dedicated Admin Old Order History (Legacy Archived Orders)
+app.get('/api/admin/old-orders-history', verifyToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    try {
+        const oldOrders = await Order.find({ isLegacyOrder: true }).sort({ _id: -1 }).select('-events -__v').lean();
+        const populatedOrders = await populateRidersDetails(oldOrders);
+        const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
+        res.json(finalOrders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET: Customer's own active orders or Rider's assigned tasks
 app.get('/api/orders/my-orders', verifyToken, async (req, res) => {
     try {
         if (req.user.role === 'customer') {
             const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
             const orders = await Order.find({ 
+                isLegacyOrder: { $ne: true },
                 $or: [
                     { phone: cleanPhone },
                     { mobile_number: cleanPhone },
@@ -698,7 +1227,7 @@ app.get('/api/orders/my-orders', verifyToken, async (req, res) => {
             const populatedOrders = await populateRidersDetails(orders);
             return res.json(populatedOrders);
         } else if (req.user.role === 'rider') {
-            const orders = await Order.find({ assignedRiderId: req.user.id }).sort({ _id: -1 }).select('-events -__v').lean();
+            const orders = await Order.find({ assignedRiderId: req.user.id, isLegacyOrder: { $ne: true } }).sort({ _id: -1 }).select('-events -__v').lean();
             const populatedOrders = await populateRidersDetails(orders);
             return res.json(populatedOrders);
         } else {
@@ -709,13 +1238,13 @@ app.get('/api/orders/my-orders', verifyToken, async (req, res) => {
     }
 });
 
-// GET: Orders by Store (Manager, Admin, or Rider)
+// GET: Orders by Store (Manager, Admin, or Rider - Active Only)
 app.get('/api/orders/store/:storeId', verifyToken, async (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'rider' && req.user.id !== req.params.storeId) {
         return res.status(403).json({ error: 'Access denied to this store' });
     }
     try {
-        const filter = { storeId: req.params.storeId };
+        const filter = { storeId: req.params.storeId, isLegacyOrder: { $ne: true } };
         if (req.query.fast === '1') {
             const limit = Math.min(Number(req.query.limit) || 10000, 50000);
             const [orders, summary] = await Promise.all([
@@ -738,8 +1267,9 @@ app.get('/api/orders/store/:storeId', verifyToken, async (req, res) => {
                 ])
             ]);
             const populatedOrders = await populateRidersDetails(orders);
+            const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
             return res.json({
-                orders: populatedOrders,
+                orders: finalOrders,
                 summary: summary[0] || {
                     totalOrders: 0,
                     pendingPayments: 0,
@@ -752,7 +1282,8 @@ app.get('/api/orders/store/:storeId', verifyToken, async (req, res) => {
         }
         const orders = await Order.find(filter).sort({ _id: -1 }).select('-events -__v').lean();
         const populatedOrders = await populateRidersDetails(orders);
-        res.json(populatedOrders);
+        const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
+        res.json(finalOrders);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -776,7 +1307,9 @@ app.get('/api/orders/:id', verifyToken, async (req, res) => {
         }
         
         const populatedOrder = await populateRiderDetails(order);
-        res.json(populatedOrder);
+        const orderObj = populatedOrder.toObject ? populatedOrder.toObject() : populatedOrder;
+        const [finalOrder] = await attachRepeatCustomerFlag([orderObj]);
+        res.json(finalOrder);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -844,10 +1377,439 @@ app.post('/api/riders/token', verifyToken, async (req, res) => {
 app.post('/api/customers/token', verifyToken, async (req, res) => {
     if (req.user.role !== 'customer') return res.status(403).json({ error: 'Customer only' });
     try {
-        const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
-        await Customer.findOneAndUpdate({ phone: cleanPhone }, { fcmToken: req.body.token }, { upsert: true });
+        let customer;
+        if (req.user.authProvider === 'google') {
+            customer = await Customer.findOne({ $or: [{ email: req.user.id }, { phone: req.user.id.replace(/\D/g, '').slice(-10) }] });
+        } else {
+            const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
+            customer = await Customer.findOne({ phone: cleanPhone });
+        }
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        customer.fcmToken = req.body.token;
+        await customer.save();
         res.json({ status: 'success' });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST: Calculate Delivery Fee by Distance in KM
+app.post('/api/delivery/calculate', (req, res) => {
+    const { distanceKm, subtotal } = req.body;
+    const result = calculateDeliveryFee(distanceKm, subtotal);
+    res.json(result);
+});
+
+// GET: Customer Lookup by Phone (for Rider, Manager, Admin to place orders on behalf of customer)
+app.get('/api/customers/lookup', async (req, res) => {
+    try {
+        const rawPhone = req.query.phone || '';
+        const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+        if (!cleanPhone || cleanPhone.length < 10) {
+            return res.status(400).json({ error: 'Valid 10-digit phone number is required' });
+        }
+
+        const customer = await Customer.findOne({ phone: cleanPhone });
+        const pastOrdersCount = await Order.countDocuments({ phone: new RegExp(cleanPhone + '$') });
+        const lastOrder = await Order.findOne({ phone: new RegExp(cleanPhone + '$') }).sort({ _id: -1 });
+
+        if (customer || lastOrder) {
+            const rawAddr = (customer && customer.address) ? customer.address : (lastOrder ? lastOrder.address : '');
+            const cleanAddr = (rawAddr && rawAddr !== 'Store Walk-in' && rawAddr !== 'Self Pickup') ? rawAddr : '';
+            return res.json({
+                found: true,
+                phone: cleanPhone,
+                name: (customer && customer.name) ? customer.name : (lastOrder ? lastOrder.name : ''),
+                address: cleanAddr,
+                accountType: (customer && customer.accountType) ? customer.accountType : (lastOrder ? (lastOrder.cx_type || lastOrder.accountType) : 'Residential'),
+                pastOrders: pastOrdersCount,
+                lastOrderDate: lastOrder ? lastOrder.timestamp : (customer ? customer.timestamp : ''),
+                isRepeat: pastOrdersCount > 0
+            });
+        }
+
+        return res.json({
+            found: false,
+            phone: cleanPhone
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET: Customer Search & Recent Repeat Customers (for Manager, Admin, Rider)
+app.get('/api/customers/search', async (req, res) => {
+    try {
+        const query = String(req.query.q || '').trim();
+        const limit = Math.min(parseInt(req.query.limit) || 10, 30);
+        const cleanDigits = query.replace(/\D/g, '');
+
+        let customersMap = new Map();
+
+        if (query.length > 0) {
+            // Search in Customer collection by name or phone
+            const customerConditions = [];
+            if (cleanDigits.length >= 3) {
+                customerConditions.push({ phone: { $regex: cleanDigits, $options: 'i' } });
+            }
+            if (query.length >= 2) {
+                customerConditions.push({ name: { $regex: query, $options: 'i' } });
+            }
+
+            if (customerConditions.length > 0) {
+                const matchedCustomers = await Customer.find({ $or: customerConditions }).limit(limit).lean();
+                for (const cx of matchedCustomers) {
+                    if (!cx.phone) continue;
+                    const cleanPhone = cx.phone.replace(/\D/g, '').slice(-10);
+                    customersMap.set(cleanPhone, {
+                        phone: cleanPhone,
+                        name: cx.name || 'Customer',
+                        address: (cx.address && cx.address !== 'Store Walk-in' && cx.address !== 'Self Pickup') ? cx.address : '',
+                        accountType: cx.accountType || 'Residential',
+                        orderCount: 0,
+                        lastOrderDate: cx.timestamp || '',
+                        isRepeat: false
+                    });
+                }
+            }
+
+            // Search in Order collection to catch all customers with order history
+            const orderConditions = [];
+            if (cleanDigits.length >= 3) {
+                orderConditions.push({ phone: { $regex: cleanDigits, $options: 'i' } });
+                orderConditions.push({ mobile_number: { $regex: cleanDigits, $options: 'i' } });
+            }
+            if (query.length >= 2) {
+                orderConditions.push({ name: { $regex: query, $options: 'i' } });
+                orderConditions.push({ customer_name: { $regex: query, $options: 'i' } });
+            }
+
+            if (orderConditions.length > 0) {
+                const matchedOrders = await Order.aggregate([
+                    { $match: { $or: orderConditions } },
+                    { $sort: { _id: -1 } },
+                    { $group: {
+                        _id: "$phone",
+                        name: { $first: "$name" },
+                        address: { $first: "$address" },
+                        accountType: { $first: "$accountType" },
+                        cx_type: { $first: "$cx_type" },
+                        lastOrderDate: { $first: "$timestamp" },
+                        orderCount: { $sum: 1 }
+                    }},
+                    { $sort: { orderCount: -1 } },
+                    { $limit: limit }
+                ]);
+
+                for (const ord of matchedOrders) {
+                    if (!ord._id) continue;
+                    const cleanPhone = String(ord._id).replace(/\D/g, '').slice(-10);
+                    if (!cleanPhone || cleanPhone.length < 10) continue;
+
+                    const existing = customersMap.get(cleanPhone) || {};
+                    const cleanAddr = (ord.address && ord.address !== 'Store Walk-in' && ord.address !== 'Self Pickup') ? ord.address : (existing.address || '');
+                    customersMap.set(cleanPhone, {
+                        phone: cleanPhone,
+                        name: existing.name && existing.name !== 'Customer' ? existing.name : (ord.name || 'Customer'),
+                        address: cleanAddr,
+                        accountType: existing.accountType || ord.cx_type || ord.accountType || 'Residential',
+                        orderCount: ord.orderCount || 1,
+                        lastOrderDate: ord.lastOrderDate || existing.lastOrderDate || '',
+                        isRepeat: (ord.orderCount || 1) > 1
+                    });
+                }
+            }
+        } else {
+            // When query is empty, return top frequent & recent customers from Orders
+            const recentRepeatCx = await Order.aggregate([
+                { $match: { phone: { $exists: true, $ne: '' } } },
+                { $sort: { _id: -1 } },
+                { $group: {
+                    _id: "$phone",
+                    name: { $first: "$name" },
+                    address: { $first: "$address" },
+                    accountType: { $first: "$accountType" },
+                    cx_type: { $first: "$cx_type" },
+                    lastOrderDate: { $first: "$timestamp" },
+                    orderCount: { $sum: 1 }
+                }},
+                { $sort: { orderCount: -1, _id: -1 } },
+                { $limit: limit }
+            ]);
+
+            for (const ord of recentRepeatCx) {
+                if (!ord._id) continue;
+                const cleanPhone = String(ord._id).replace(/\D/g, '').slice(-10);
+                if (!cleanPhone || cleanPhone.length < 10) continue;
+
+                const cleanAddr = (ord.address && ord.address !== 'Store Walk-in' && ord.address !== 'Self Pickup') ? ord.address : '';
+                customersMap.set(cleanPhone, {
+                    phone: cleanPhone,
+                    name: ord.name || 'Customer',
+                    address: cleanAddr,
+                    accountType: ord.cx_type || ord.accountType || 'Residential',
+                    orderCount: ord.orderCount || 1,
+                    lastOrderDate: ord.lastOrderDate || '',
+                    isRepeat: (ord.orderCount || 1) > 1
+                });
+            }
+        }
+
+        // For any customers from Customer collection without orderCount computed, fetch their counts
+        const results = Array.from(customersMap.values());
+        for (const item of results) {
+            if (item.orderCount === 0) {
+                item.orderCount = await Order.countDocuments({ phone: new RegExp(item.phone + '$') });
+                item.isRepeat = item.orderCount > 1;
+                if (!item.lastOrderDate) {
+                    const last = await Order.findOne({ phone: new RegExp(item.phone + '$') }).sort({ _id: -1 }).select('timestamp');
+                    if (last && last.timestamp) item.lastOrderDate = last.timestamp;
+                }
+            }
+        }
+
+        // Sort results: highest orderCount first, then alphabetical
+        results.sort((a, b) => (b.orderCount - a.orderCount));
+
+        res.json({
+            count: results.length,
+            customers: results.slice(0, limit)
+        });
+    } catch (err) {
+        console.error('Customer Search Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- REFER & EARN HELPERS & ENDPOINTS ---
+async function generateUniqueReferralCode(customer) {
+    let base = 'LB';
+    if (customer && customer.name && customer.name.trim().length >= 2) {
+        base = customer.name.trim().split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+        if (base.length < 2) base = 'LB';
+    }
+    const cleanPhone = (customer && customer.phone) ? String(customer.phone).replace(/\D/g, '').slice(-4) : '';
+    let code = `${base}${cleanPhone || Math.floor(1000 + Math.random() * 9000)}`;
+
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 30) {
+        attempts++;
+        const existing = await Customer.findOne({ referralCode: code });
+        if (!existing || (customer && customer._id && String(existing._id) === String(customer._id))) {
+            isUnique = true;
+        } else {
+            code = `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+    }
+    return code;
+}
+
+// GET: Customer Referral Details & Stats
+app.get('/api/referral/details', verifyToken, async (req, res) => {
+    try {
+        let customer;
+        if (req.user.authProvider === 'google') {
+            customer = await Customer.findOne({ $or: [{ email: req.user.id }, { phone: req.user.id.replace(/\D/g, '').slice(-10) }] });
+        } else {
+            const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
+            customer = await Customer.findOne({ phone: cleanPhone });
+        }
+
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer account not found' });
+        }
+
+        // Generate referral code if not already assigned
+        if (!customer.referralCode) {
+            customer.referralCode = await generateUniqueReferralCode(customer);
+            await customer.save();
+        }
+
+        // Fetch referred orders
+        const referredOrders = await Order.find({ appliedReferralCode: customer.referralCode })
+            .select('id name status total timestamp referralRewardClaimed')
+            .sort({ _id: -1 })
+            .limit(20);
+
+        const successfulCount = referredOrders.filter(o => o.status === 'Delivered to Cx' || o.status === 'Completed').length;
+
+        const friendsList = referredOrders.map(o => {
+            const rawName = o.name || 'Friend';
+            const maskedName = rawName.length > 2 ? `${rawName.substring(0, 2)}***` : rawName;
+            const isCompleted = o.status === 'Delivered to Cx' || o.status === 'Completed';
+            return {
+                orderId: o.id,
+                name: maskedName,
+                status: isCompleted ? 'Reward Credited (+₹100)' : `In Progress (${o.status})`,
+                isCompleted,
+                date: o.timestamp || 'Recent'
+            };
+        });
+
+        res.json({
+            referralCode: customer.referralCode,
+            shareUrl: `https://www.laundrybasketunicorn.com/?ref=${customer.referralCode}`,
+            points: customer.walletBalance || 0,
+            walletBalance: customer.walletBalance || 0,
+            successfulReferrals: customer.referralCount || successfulCount,
+            totalEarned: (customer.referralCount || successfulCount) * 100,
+            rules: {
+                pointsPerReferral: 100,
+                friendDiscount: 100,
+                minRedeemPoints: 100,
+                maxRedeemPoints: 100,
+                discountPer100Points: 100,
+                eligibleService: 'Dry Cleaning',
+                minOrderValue: 349,
+                rewardTrigger: 'Points credited after referred friend places first order and delivery is successfully completed'
+            },
+            termsAndConditions: [
+                "Give ₹100, Get 100: Your referred friend receives Flat ₹100 OFF on their first order, and you earn Flat 100 Reward Points (worth ₹100).",
+                "Minimum & Maximum Discount: Exactly 100 points (worth ₹100) can be redeemed per eligible Dry Cleaning order. Partial redemptions (under 100) or multiple redemptions (over 100) on a single order are not permitted.",
+                "Points are credited only AFTER the referred friend's first order is successfully Delivered to Cx.",
+                "Referral points can ONLY be redeemed on Dry Cleaning services. Points are not valid on Wash & Fold or Steam Press.",
+                "A minimum order value of ₹349 on Dry Cleaning is mandatory to redeem points.",
+                "Points are non-transferable and cannot be converted or exchanged for cash.",
+                "Orders cancelled or returned will not qualify for referral reward points.",
+                "Self-referral or fraudulent use will lead to immediate cancellation of points and account suspension."
+            ],
+            friendsList
+        });
+    } catch (err) {
+        console.error('Referral Details Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST: Validate Referral Code (applied during booking / checkout)
+app.post('/api/referral/validate', async (req, res) => {
+    try {
+        const code = req.body.code || req.body.referralCode;
+        const phone = req.body.phone;
+        if (!code || !String(code).trim()) {
+            return res.status(400).json({ valid: false, message: 'Please enter a referral code' });
+        }
+
+        const cleanCode = String(code).trim().toUpperCase();
+
+        // Built-in promotional voucher codes
+        if (cleanCode === 'LAUNDRY50' || cleanCode === 'WELCOME50') {
+            return res.json({
+                valid: true,
+                code: cleanCode,
+                discount: 50,
+                discountAmount: 50,
+                referrerName: 'Special Offer',
+                message: 'Promotional code applied! Flat ₹50 OFF on your order.'
+            });
+        }
+        if (cleanCode === 'FRIEND100' || cleanCode === 'LAUNDRY100' || cleanCode === 'WELCOME100') {
+            return res.json({
+                valid: true,
+                code: cleanCode,
+                discount: 100,
+                discountAmount: 100,
+                referrerName: 'Special Offer',
+                message: 'Promotional code applied! Flat ₹100 OFF on your order.'
+            });
+        }
+
+        const referrer = await Customer.findOne({ referralCode: cleanCode });
+        if (!referrer) {
+            return res.status(404).json({ valid: false, message: 'Invalid referral code' });
+        }
+
+        // Check if user is referring themselves
+        if (phone) {
+            const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+            if (referrer.phone && referrer.phone === cleanPhone) {
+                return res.status(400).json({ valid: false, message: 'You cannot use your own referral code' });
+            }
+
+            // Check if user has already placed orders
+            const pastOrdersCount = await Order.countDocuments({ phone: new RegExp(cleanPhone + '$') });
+            if (pastOrdersCount > 0) {
+                return res.status(400).json({ valid: false, message: 'Referral codes are only valid for your first order' });
+            }
+        }
+
+        res.json({
+            valid: true,
+            code: cleanCode,
+            discount: 100,
+            discountAmount: 100,
+            referrerName: referrer.name ? referrer.name.split(' ')[0] : 'a friend',
+            message: 'Referral code applied! You get ₹100 OFF on your first order.'
+        });
+    } catch (err) {
+        res.status(500).json({ valid: false, error: err.message });
+    }
+});
+
+// POST: Validate Dry Cleaning Points Redemption (Fixed 100 points = ₹100, Min ₹349, Dry Cleaning only)
+app.post('/api/referral/validate-points', verifyToken, async (req, res) => {
+    try {
+        const { services, subtotal, points: requestedPoints } = req.body;
+
+        // Strictly enforce that minimum & maximum points that can be redeemed is 100
+        if (requestedPoints !== undefined && Number(requestedPoints) !== 100) {
+            return res.status(400).json({
+                valid: false,
+                message: 'Minimum and maximum discount is fixed at exactly 100 points for ₹100.'
+            });
+        }
+
+        let customer;
+        if (req.user.authProvider === 'google') {
+            customer = await Customer.findOne({ $or: [{ email: req.user.id }, { phone: req.user.id.replace(/\D/g, '').slice(-10) }] });
+        } else {
+            const cleanPhone = req.user.id.replace(/\D/g, '').slice(-10);
+            customer = await Customer.findOne({ phone: cleanPhone });
+        }
+
+        if (!customer) return res.status(404).json({ valid: false, message: 'Customer not found' });
+
+        const points = customer.walletBalance || 0;
+        if (points < 100) {
+            return res.status(400).json({
+                valid: false,
+                message: `Insufficient points. You have ${points} points (minimum and maximum 100 points required to redeem ₹100 discount).`
+            });
+        }
+
+        // Check if order contains Dry Cleaning
+        const serviceList = Array.isArray(services) ? services : [services].filter(Boolean);
+        const hasDryCleaning = serviceList.some(s => /dry\s*clean/i.test(String(s)));
+
+        if (!hasDryCleaning) {
+            return res.status(400).json({
+                valid: false,
+                message: 'Referral points are strictly usable for Dry Cleaning services only.'
+            });
+        }
+
+        // Check Minimum Order Value (₹349)
+        const numSubtotal = Number(subtotal) || 0;
+        if (numSubtotal < 349) {
+            return res.status(400).json({
+                valid: false,
+                message: 'Minimum order value of ₹349 on Dry Cleaning is required to redeem points.'
+            });
+        }
+
+        res.json({
+            valid: true,
+            minPoints: 100,
+            maxPoints: 100,
+            redeemPoints: 100,
+            discount: 100,
+            remainingPoints: points - 100,
+            message: '🎉 100 Dry Cleaning Points Applied! Flat ₹100 OFF.'
+        });
+    } catch (err) {
+        res.status(500).json({ valid: false, error: err.message });
+    }
 });
 
 // POST: Create New Order
@@ -860,10 +1822,12 @@ app.post('/api/orders', async (req, res) => {
         // Fetch customer to check account type if not provided
         let isHotel = req.body.accountType === 'Hotel';
         if (!isHotel && req.body.phone) {
-            const cleanPhone = req.body.phone.replace(/\D/g, '').slice(-10);
-            const customer = await Customer.findOne({ phone: cleanPhone });
-            if (customer && customer.accountType === 'Hotel') {
-                isHotel = true;
+            const cleanPhone = String(req.body.phone).replace(/\D/g, '').slice(-10);
+            if (cleanPhone) {
+                const customer = await Customer.findOne({ phone: cleanPhone });
+                if (customer && customer.accountType === 'Hotel') {
+                    isHotel = true;
+                }
             }
         }
         
@@ -873,10 +1837,12 @@ app.post('/api/orders', async (req, res) => {
         
         let cxType = req.body.cx_type || req.body.accountType;
         if (!cxType && req.body.phone) {
-            const cleanPhone = req.body.phone.replace(/\D/g, '').slice(-10);
-            const customer = await Customer.findOne({ phone: cleanPhone });
-            if (customer) {
-                cxType = customer.accountType;
+            const cleanPhone = String(req.body.phone).replace(/\D/g, '').slice(-10);
+            if (cleanPhone) {
+                const customer = await Customer.findOne({ phone: cleanPhone });
+                if (customer) {
+                    cxType = customer.accountType;
+                }
             }
         }
         if (!cxType) {
@@ -889,109 +1855,240 @@ app.post('/api/orders', async (req, res) => {
         let orderId = req.body.id;
         if (!orderId) {
             const counterId = isBusiness ? `order_id_${branchCode}_bus` : `order_id_${branchCode}_res`;
-            
-            // Custom initial sequence logic: AN branch starts from existing counts
-            const isAN = (branchCode.toUpperCase() === 'AN' || storeName.toUpperCase() === 'AN');
-            let initialSeq = 1;
-            if (isAN) {
-                initialSeq = isBusiness ? 379 : 1135;
-            }
+            let initialSeq = 1001;
 
             let counter = await Counter.findOne({ id: counterId });
             if (!counter) {
                 counter = new Counter({ id: counterId, seq: initialSeq });
                 await counter.save();
-            } else {
-                if (counter.seq < initialSeq) {
-                    counter = await Counter.findOneAndUpdate(
-                        { id: counterId },
-                        { $set: { seq: initialSeq } },
-                        { new: true }
-                    );
-                } else {
-                    counter = await Counter.findOneAndUpdate(
-                        { id: counterId },
-                        { $inc: { seq: 1 } },
-                        { new: true }
-                    );
-                }
+            } else if (counter.seq < initialSeq) {
+                counter = await Counter.findOneAndUpdate(
+                    { id: counterId },
+                    { $set: { seq: initialSeq } },
+                    { new: true }
+                );
             }
 
-            if (isBusiness) {
-                const seqPadded = String(counter.seq).padStart(6, '0');
-                orderId = `LBBPLB${storeName}${seqPadded}`;
-            } else {
-                const seqPadded = String(counter.seq).padStart(7, '0');
-                orderId = `LBBPL${storeName}${seqPadded}`;
+            // Ensure unique orderId that doesn't collide with existing DB orders
+            let isUnique = false;
+            while (!isUnique) {
+                counter = await Counter.findOneAndUpdate(
+                    { id: counterId },
+                    { $inc: { seq: 1 } },
+                    { new: true, upsert: true }
+                );
+                if (isBusiness) {
+                    const seqPadded = String(counter.seq).padStart(6, '0');
+                    orderId = `LBB${storeName}${seqPadded}`;
+                } else {
+                    orderId = `LB${counter.seq}`;
+                }
+                const existing = await Order.findOne({ id: orderId });
+                if (!existing) {
+                    isUnique = true;
+                }
             }
         }
         const generatedPickupCode = String(Math.floor(1000 + Math.random() * 9000));
         const generatedDeliveryCode = String(Math.floor(1000 + Math.random() * 9000));
+
+        // Delivery Charge & Distance Calculation - Safe Numeric Parsing
+        const distanceKm = Number(req.body.distanceKm) || 0;
+        const rawSubtotal = Number(req.body.subtotal) || Number(req.body.total) || 0;
+        const subtotal = isNaN(rawSubtotal) ? 0 : rawSubtotal;
+        const deliveryCalc = calculateDeliveryFee(distanceKm, subtotal);
+        const rawDeliveryFee = req.body.deliveryFee !== undefined ? Number(req.body.deliveryFee) : deliveryCalc.fee;
+        const deliveryFee = isNaN(rawDeliveryFee) ? 0 : rawDeliveryFee;
+        const rawFinalTotal = req.body.total !== undefined ? Number(req.body.total) : (subtotal + deliveryFee);
+        const finalTotal = isNaN(rawFinalTotal) ? (subtotal + deliveryFee) : rawFinalTotal;
+
+        const isRiderPlacement = req.body.placedBy === 'rider' || Boolean(req.body.pickupRiderId);
+        const orderStatus = req.body.status || 'Pending';
+        const isDirectPickup = orderStatus === 'Pickup Done' || orderStatus === 'Picked Up';
+
+        let initialEvents = req.body.events;
+        if (!initialEvents || !Array.isArray(initialEvents) || initialEvents.length === 0) {
+            initialEvents = [{ status: 'Pending', time: new Date().toLocaleTimeString() }];
+            if (isDirectPickup) {
+                initialEvents.push({ 
+                    status: 'Pickup Done', 
+                    time: new Date().toLocaleTimeString(), 
+                    note: req.body.pickupRiderName ? `Picked up by Rider ${req.body.pickupRiderName}` : 'Picked up on the spot' 
+                });
+            }
+        }
 
         const orderData = {
             ...req.body,
             storeId: finalStoreId,
             id: orderId,
             cx_type: cxType,
-            status: req.body.status || 'Pending',
+            subtotal: subtotal,
+            distanceKm: distanceKm,
+            deliveryFee: deliveryFee,
+            total: finalTotal,
+            status: orderStatus,
             pickupCode: req.body.pickupCode || generatedPickupCode,
             deliveryCode: req.body.deliveryCode || generatedDeliveryCode,
+            pickupPhoto: req.body.pickupPhoto || null,
+            placedBy: req.body.placedBy || (isRiderPlacement ? 'rider' : 'Customer'),
+            pickupRiderId: req.body.pickupRiderId || null,
+            pickupRiderName: req.body.pickupRiderName || null,
             timestamp: req.body.timestamp || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            events: req.body.events || [{ status: 'Pending', time: new Date().toLocaleTimeString() }]
+            events: initialEvents
         };
 
-        const newOrder = new Order(orderData);
-        await newOrder.save();
-        req.io.emit("order_created", newOrder);
+        // Collision-proof saving with automatic retry if duplicate key occurs
+        let newOrder;
+        let saved = false;
+        let attempts = 0;
+        while (!saved && attempts < 5) {
+            try {
+                attempts++;
+                newOrder = new Order(orderData);
+                await newOrder.save();
+                saved = true;
+            } catch (saveErr) {
+                if (saveErr.code === 11000 && attempts < 5) {
+                    console.warn(`Order ID collision on ${orderData.id}, generating next ID...`);
+                    const counterId = isBusiness ? `order_id_${branchCode}_bus` : `order_id_${branchCode}_res`;
+                    const nextCounter = await Counter.findOneAndUpdate(
+                        { id: counterId },
+                        { $inc: { seq: 1 } },
+                        { new: true, upsert: true }
+                    );
+                    orderData.id = isBusiness 
+                        ? `LBB${storeName}${String(nextCounter.seq).padStart(6, '0')}` 
+                        : `LB${nextCounter.seq}`;
+                    orderId = orderData.id;
+                } else {
+                    throw saveErr;
+                }
+            }
+        }
+
+        const orderObj = newOrder.toObject();
+        const cleanPhoneNum = orderObj.phone ? String(orderObj.phone).replace(/\D/g, '').slice(-10) : '';
+        let isRepeat = false;
+        let ordersCountForUser = 1;
+        if (cleanPhoneNum) {
+            ordersCountForUser = await Order.countDocuments({ phone: cleanPhoneNum });
+            isRepeat = ordersCountForUser > 1;
+
+            // Ensure Customer record exists in DB for future logins & profile
+            try {
+                let customer = await Customer.findOne({ phone: cleanPhoneNum });
+                if (!customer) {
+                    const tempRefCode = await generateUniqueReferralCode({ name: orderObj.name, phone: cleanPhoneNum });
+                    customer = new Customer({
+                        phone: cleanPhoneNum,
+                        name: orderObj.name || '',
+                        accountType: cxType || 'Residential',
+                        authProvider: 'phone',
+                        referralCode: tempRefCode
+                    });
+                    await customer.save();
+                } else if (!customer.referralCode) {
+                    customer.referralCode = await generateUniqueReferralCode(customer);
+                    if (!customer.name && orderObj.name) customer.name = orderObj.name;
+                    await customer.save();
+                } else if (!customer.name && orderObj.name) {
+                    customer.name = orderObj.name;
+                    await customer.save();
+                }
+            } catch (custErr) {
+                console.warn('Customer upsert from order failed:', custErr.message);
+            }
+
+            // Deduct redeemed Dry Cleaning points if applied (Fixed Min & Max: 100 points for ₹100)
+            const rawRedeemed = parseInt(req.body.redeemedPoints) || 0;
+            const redeemedPoints = rawRedeemed > 0 ? 100 : 0;
+            if (redeemedPoints === 100) {
+                try {
+                    const customer = await Customer.findOne({ phone: cleanPhoneNum });
+                    if (customer && (customer.walletBalance || 0) >= 100) {
+                        customer.walletBalance = Math.max(0, (customer.walletBalance || 0) - 100);
+                        await customer.save();
+                        if (req.io) {
+                            req.io.to(`customer_${cleanPhoneNum}`).emit('wallet_updated', {
+                                walletBalance: customer.walletBalance,
+                                message: `Redeemed 100 points for ₹100 Dry Cleaning discount!`
+                            });
+                        }
+                    }
+                } catch (pErr) {
+                    console.warn('Points deduction error:', pErr.message);
+                }
+            }
+        }
+        orderObj.isRepeatCustomer = isRepeat;
+        orderObj.customerOrdersCount = ordersCountForUser;
+
+        if (req.io) {
+            req.io.emit("order_created", orderObj);
+            if (isDirectPickup) {
+                req.io.emit("order_status_updated", { id: orderObj.id, status: orderObj.status, order: orderObj });
+            }
+            // Broadcast to admin dashboard
+            req.io.to('dashboard_monitors').emit('new_order_received', {
+                message: isDirectPickup ? `Direct pickup ${orderId} created by rider!` : `New order ${orderId} received!`,
+                order: orderObj
+            });
+            // Broadcast to customer room
+            if (orderObj.phone) {
+                const cleanPhone = String(orderObj.phone).replace(/\D/g, '').slice(-10);
+                if (cleanPhone) {
+                    req.io.to(`customer_${cleanPhone}`).emit('order_created', {
+                        message: isDirectPickup 
+                            ? `Your laundry order ${orderId} was collected by ${orderObj.pickupRiderName || 'our rider'}!` 
+                            : `Your order ${orderId} has been placed!`,
+                        order: orderObj
+                    });
+                }
+            }
+        }
+
         // ☁️ Sync to Firestore (mobile app real-time)
-        syncToFirestore('orders', newOrder.id, newOrder.toObject());
+        syncToFirestore('orders', orderObj.id, orderObj);
 
         // 🔔 NOTIFY MANAGER (Store Room)
         sendNotification({
             topic: `store_${finalStoreId}`,
-            title: "🧺 New Order Received!",
-            body: `Order ${orderId} has been placed at your branch.`,
-            data: { orderId, type: 'new_order', total: String(newOrder.total) }
+            title: isDirectPickup ? "🧺 On-the-spot Pickup Created!" : "🧺 New Order Received!",
+            body: isDirectPickup 
+                ? `Order ${orderId} picked up by ${orderObj.pickupRiderName || 'rider'} for ${orderObj.name}`
+                : `Order ${orderId} has been placed at your branch.`,
+            data: { orderId, type: 'new_order', total: String(orderObj.total), status: String(orderObj.status) }
         });
 
-        // 🔔 NOTIFY RIDERS (Store Riders Room)
-        sendNotification({
-            topic: `riders_store_${finalStoreId}`,
-            title: "🛵 New Pickup Available!",
-            body: `Order ${orderId} | ${newOrder.name} | Loc: ${newOrder.address}`,
-            data: { 
-                orderId, 
-                type: 'new_pickup_available',
-                name: String(newOrder.name),
-                phone: String(newOrder.phone),
-                address: String(newOrder.address),
-                info: String(Array.isArray(newOrder.services) ? newOrder.services.join(', ') : newOrder.services || '')
-            }
-        });
-        
-        req.io.to(`riders_store_${finalStoreId}`).emit('new_task_assigned', {
-            message: `New pickup available for ${newOrder.name}`,
-            order: newOrder
-        });
-
-        // Broadcast to admin dashboard
-        req.io.to('dashboard_monitors').emit('new_order_received', {
-            message: `New order ${orderId} received!`,
-            order: newOrder
-        });
-
-        // Broadcast to customer room
-        if (newOrder.phone) {
-            const cleanPhone = newOrder.phone.replace(/\D/g, '').slice(-10);
-            req.io.to(`customer_${cleanPhone}`).emit('order_created', {
-                message: `Your order ${orderId} has been placed!`,
-                order: newOrder
+        // 🔔 NOTIFY RIDERS (Store Riders Room - only if not already picked up)
+        if (!isDirectPickup) {
+            sendNotification({
+                topic: `riders_store_${finalStoreId}`,
+                title: "🛵 New Pickup Available!",
+                body: `Order ${orderId} | ${orderObj.name} | Loc: ${orderObj.address}`,
+                data: { 
+                    orderId, 
+                    type: 'new_pickup_available',
+                    name: String(orderObj.name),
+                    phone: String(orderObj.phone),
+                    address: String(orderObj.address),
+                    info: String(Array.isArray(orderObj.services) ? orderObj.services.join(', ') : orderObj.services || '')
+                }
             });
+            
+            if (req.io) {
+                req.io.to(`riders_store_${finalStoreId}`).emit('new_task_assigned', {
+                    message: `New pickup available for ${orderObj.name}`,
+                    order: orderObj
+                });
+            }
         }
 
-        res.status(201).json(newOrder);
+        res.status(201).json(orderObj);
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        console.error('Order creation error:', err);
+        res.status(400).json({ error: err.message || 'Failed to create order' });
     }
 });
 
@@ -1005,9 +2102,25 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to update this order' });
         }
 
+        const oldStoreId = order.storeId;
+        const newStoreId = req.body.storeId;
+        const isTransfer = newStoreId && newStoreId !== oldStoreId;
+
         const updateData = { ...req.body };
+        const eventsToPush = [];
         if (req.body.status) {
-            updateData.$push = { events: { status: req.body.status } };
+            eventsToPush.push({ status: req.body.status });
+        }
+        if (isTransfer) {
+            const oldStore = await Store.findOne({ id: oldStoreId });
+            const newStore = await Store.findOne({ id: newStoreId });
+            const oldName = oldStore ? oldStore.name : oldStoreId;
+            const newName = newStore ? newStore.name : newStoreId;
+            eventsToPush.push({ status: `Transferred from ${oldName} to ${newName}` });
+        }
+
+        if (eventsToPush.length > 0) {
+            updateData.$push = { events: { $each: eventsToPush } };
         }
 
         const updatedOrder = await Order.findOneAndUpdate(
@@ -1027,6 +2140,13 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         if (updatedOrder.storeId) {
             req.io.to(`store_${updatedOrder.storeId}`).emit('order_status_updated', {
                 message: `Order ${updatedOrder.id} updated`,
+                order: updatedOrder
+            });
+        }
+
+        if (isTransfer) {
+            req.io.to(`store_${oldStoreId}`).emit('order_status_updated', {
+                message: `Order ${updatedOrder.id} transferred out`,
                 order: updatedOrder
             });
         }
@@ -1099,6 +2219,42 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
             });
         }
 
+        // Referral Reward Disbursement (₹100 to Referrer on completed order)
+        if ((updatedOrder.status === 'Delivered to Cx' || updatedOrder.status === 'Completed') && 
+            updatedOrder.appliedReferralCode && 
+            !updatedOrder.referralRewardClaimed) {
+            try {
+                const referrer = await Customer.findOne({ referralCode: updatedOrder.appliedReferralCode });
+                if (referrer) {
+                    referrer.walletBalance = (referrer.walletBalance || 0) + 100;
+                    referrer.referralCount = (referrer.referralCount || 0) + 1;
+                    await referrer.save();
+
+                    await Order.findOneAndUpdate(
+                        { id: updatedOrder.id },
+                        { $set: { referralRewardClaimed: true } }
+                    );
+
+                    if (referrer.fcmToken) {
+                        sendNotification({
+                            token: referrer.fcmToken,
+                            title: "🎉 100 Dry Cleaning Points Credited!",
+                            body: `Your friend ${updatedOrder.name || 'friend'} completed their first order and delivery was successful. 100 points added to your account! Usable on Dry Cleaning (Min ₹349).`,
+                            data: { type: 'referral_reward', amount: '100', service: 'Dry Cleaning' }
+                        });
+                    }
+                    if (referrer.phone) {
+                        req.io.to(`customer_${referrer.phone}`).emit('wallet_updated', {
+                            walletBalance: referrer.walletBalance,
+                            message: `🎉 100 Dry Cleaning points credited after successful delivery! (Usable on Dry Cleaning, Min order ₹349)`
+                        });
+                    }
+                }
+            } catch (refErr) {
+                console.warn('Referral reward processing error:', refErr.message);
+            }
+        }
+
         const populatedOrder = await populateRiderDetails(updatedOrder);
         res.json(populatedOrder);
     } catch (err) {
@@ -1123,6 +2279,55 @@ app.delete('/api/orders/:id', verifyToken, async (req, res) => {
 });
 
 
+// POST: Upload Pickup or Delivery Photo (Rider)
+// Body: { type: 'pickup' | 'delivery', photo: '<base64 string>' }
+app.post('/api/orders/:orderId/photo', verifyToken, async (req, res) => {
+    try {
+        if (!['rider', 'manager', 'admin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Not authorized to upload photos' });
+        }
+        const { type, photo } = req.body;
+        if (!type || !photo) return res.status(400).json({ error: 'type and photo are required' });
+        if (!['pickup', 'delivery'].includes(type)) return res.status(400).json({ error: 'type must be pickup or delivery' });
+
+        const fieldName = type === 'pickup' ? 'pickupPhoto' : 'deliveryPhoto';
+        const order = await Order.findOneAndUpdate(
+            { id: req.params.orderId },
+            { $set: { [fieldName]: photo } },
+            { new: true }
+        );
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+
+        // Emit real-time update so manager/admin panels refresh
+        req.io.emit('order_photo_uploaded', {
+            orderId: req.params.orderId,
+            type,
+            uploadedBy: req.user.id,
+            timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+        });
+
+        res.json({ success: true, message: `${type} photo saved`, orderId: req.params.orderId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET: Fetch pickup/delivery photos for an order (Customer, Manager, Admin)
+app.get('/api/orders/:orderId/photos', verifyToken, async (req, res) => {
+    try {
+        const order = await Order.findOne({ id: req.params.orderId }, 'id pickupPhoto deliveryPhoto status');
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        res.json({
+            orderId: order.id,
+            status: order.status,
+            pickupPhoto: order.pickupPhoto || null,
+            deliveryPhoto: order.deliveryPhoto || null
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET: Global Analytics (Admin only)
 app.get('/api/analytics', verifyToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
@@ -1132,8 +2337,9 @@ app.get('/api/analytics', verifyToken, async (req, res) => {
         
         if (req.query.date) {
             const [year, month, day] = req.query.date.split('-');
-            const formattedDateStr = `${day}/${month}/${year}`;
-            filter.timestamp = { $regex: `^${formattedDateStr}` };
+            const dayInt = parseInt(day, 10);
+            const monthInt = parseInt(month, 10);
+            filter.timestamp = { $regex: `^0?${dayInt}/0?${monthInt}/${year}` };
         }
 
         const totalOrders = await Order.countDocuments(filter);
@@ -1172,10 +2378,11 @@ app.post('/api/auth/rider-login', async (req, res) => {
         if (!rider) return res.status(401).json({ message: "Invalid Rider ID" });
         if (rider.password !== password) return res.status(401).json({ message: "Invalid Password" });
 
-        const token = jwt.sign({ id: rider.id, name: rider.name, role: 'rider' }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token, rider: { id: rider.id, name: rider.name, username: rider.username, profilePicture: rider.profilePicture, storeId: rider.storeId } });
+        const token = jwt.sign({ id: rider.id, name: rider.name, role: 'rider' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        res.json({ token, role: 'rider', rider: { id: rider.id, name: rider.name, username: rider.username, profilePicture: rider.profilePicture, storeId: rider.storeId } });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 
 app.put('/api/riders/:id/profile-picture', verifyToken, async (req, res) => {
     try {
@@ -1526,6 +2733,16 @@ app.get('/api/admin/import-excel', async (req, res) => {
     }
 });
 
+// PUBLIC: Fetch Approved Stores (For Web & App)
+app.get('/api/public/stores', async (req, res) => {
+    try {
+        const stores = await Store.find({ approved: true });
+        res.json(stores);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/stores', verifyToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     try { res.json(await Store.find()); } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1560,6 +2777,36 @@ app.put('/api/stores/:id', verifyToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/manager/store-settings', verifyToken, async (req, res) => {
+    if (req.user.role !== 'manager') return res.status(403).json({ error: 'Manager only' });
+    try {
+        const store = await Store.findOne({ id: req.user.id });
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+        res.json(store);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/manager/store-settings', verifyToken, async (req, res) => {
+    if (req.user.role !== 'manager') return res.status(403).json({ error: 'Manager only' });
+    try {
+        const { googleAnalyticsId } = req.body;
+        const store = await Store.findOne({ id: req.user.id });
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        store.googleAnalyticsId = googleAnalyticsId || '';
+        await store.save();
+
+        req.io.emit('stores_updated', store);
+        syncToFirestore('stores', store.id, store.toObject());
+
+        res.json({ status: 'success', store });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.delete('/api/stores/:id', verifyToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     try {
@@ -1590,6 +2837,50 @@ app.post('/api/inventory', verifyToken, async (req, res) => {
         req.io.emit('inventory_updated', updated);
         syncToFirestore('inventory', `${finalStoreId}_${item}`, updated.toObject());
         res.json(updated);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/inventory/:id', verifyToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    try {
+        const { item, quantity, unit, storeId } = req.body;
+        const inventory = await Inventory.findById(req.params.id);
+        if (!inventory) return res.status(404).json({ error: 'Inventory item not found' });
+
+        const oldItem = inventory.item;
+        const oldStoreId = inventory.storeId;
+
+        inventory.item = item || inventory.item;
+        inventory.quantity = parseFloat(quantity) !== undefined ? parseFloat(quantity) : inventory.quantity;
+        inventory.unit = unit || inventory.unit;
+        inventory.storeId = storeId || inventory.storeId;
+        inventory.lastUpdated = new Date().toLocaleString();
+
+        await inventory.save();
+
+        req.io.emit('inventory_updated', inventory);
+
+        if (oldItem !== inventory.item || oldStoreId !== inventory.storeId) {
+            await deleteFromFirestore('inventory', `${oldStoreId}_${oldItem}`);
+        }
+        syncToFirestore('inventory', `${inventory.storeId}_${inventory.item}`, inventory.toObject());
+
+        res.json(inventory);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/inventory/:id', verifyToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    try {
+        const inventory = await Inventory.findById(req.params.id);
+        if (!inventory) return res.status(404).json({ error: 'Inventory item not found' });
+
+        await Inventory.deleteOne({ _id: req.params.id });
+
+        req.io.emit('inventory_updated', { deletedId: req.params.id });
+        await deleteFromFirestore('inventory', `${inventory.storeId}_${inventory.item}`);
+
+        res.json({ message: "Inventory item deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1713,37 +3004,329 @@ app.get('/api/public/track/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// NEWSLETTER SUBSCRIBE (Public)
+app.post('/api/public/subscribe', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+            return res.status(400).json({ error: 'Please enter a valid email address' });
+        }
+        const cleanEmail = email.toLowerCase().trim();
+        const existing = await Subscriber.findOne({ email: cleanEmail });
+        if (existing) {
+            if (existing.active) {
+                return res.json({ message: 'You\'re already subscribed! 🎉' });
+            }
+            existing.active = true;
+            existing.subscribedAt = new Date();
+            await existing.save();
+            sendWelcomeEmail(cleanEmail).catch(err => {
+                console.error("Welcome email background send failed:", err.message);
+            });
+            return res.json({ message: 'Welcome back! Subscription reactivated 🎉' });
+        }
+        await Subscriber.create({ email: cleanEmail });
+        sendWelcomeEmail(cleanEmail).catch(err => {
+            console.error("Welcome email background send failed:", err.message);
+        });
+        res.json({ message: 'Successfully subscribed! 🎉' });
+    } catch (err) {
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+});
+
+// Admin: List all subscribers
+app.get('/api/subscribers', verifyToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+        const subscribers = await Subscriber.find({ active: true }).sort({ subscribedAt: -1 });
+        res.json(subscribers);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // EXPORT & LOGS
 const xlsx = require('xlsx');
 
 app.get('/api/export/excel', verifyToken, async (req, res) => {
     try {
-        const orders = await Order.find().sort({ timestamp: -1 }).lean();
-        
-        const data = orders.map(order => ({
-            'Order ID': order.id,
-            'Date': order.timestamp,
-            'Customer Name': order.name,
-            'Phone': order.phone,
-            'Address': order.address || 'Walk-in',
-            'Source': order.source || 'Walk-in',
-            'Services': Array.isArray(order.services) ? order.services.join(', ') : order.services,
-            'Status': order.status,
-            'Total (₹)': order.total,
-            'Discount (%)': order.discount || 0
-        }));
+        let filter = {};
+        if (req.user.role === 'manager') {
+            filter.storeId = req.user.id;
+        } else if (req.user.role === 'admin' && req.query.storeId && req.query.storeId !== 'all') {
+            filter.storeId = req.query.storeId;
+        }
 
-        const worksheet = xlsx.utils.json_to_sheet(data);
+        // Apply date filter unless allTime=true is requested
+        if (req.query.allTime !== 'true' && req.query.date) {
+            const [year, month, day] = req.query.date.split('-');
+            const dayInt = parseInt(day, 10);
+            const monthInt = parseInt(month, 10);
+            filter.timestamp = { $regex: `^0?${dayInt}/0?${monthInt}/${year}` };
+        }
+
+        const orders = await Order.find(filter).sort({ timestamp: -1 }).lean();
+        const finalOrders = await attachRepeatCustomerFlag(orders);
+        
+        const stores = await Store.find().lean();
+        const storeMap = {};
+        stores.forEach(s => {
+            storeMap[s.id] = s.name;
+        });
+        
+        // 1. Map orders detailed log data
+        const data = finalOrders.map(order => {
+            const servicesList = Array.isArray(order.services) ? order.services : (order.services ? String(order.services).split(',') : []);
+            let computedSubtotal = 0;
+            servicesList.forEach(s => {
+                const parsed = parseService(s);
+                computedSubtotal += parsed.price || 0;
+            });
+            
+            const netAmount = Number(order.total) || 0;
+            const discountPct = Number(order.discount) || 0;
+            
+            let grossAmount = computedSubtotal;
+            if (grossAmount <= 0) {
+                if (discountPct > 0 && discountPct < 100) {
+                    grossAmount = netAmount / (1 - discountPct / 100);
+                } else {
+                    grossAmount = netAmount;
+                }
+            }
+            
+            grossAmount = Math.round(grossAmount);
+            const discountAmount = Math.max(0, grossAmount - netAmount);
+            const cleanServicesStr = servicesList.map(s => {
+                const parsed = parseService(s);
+                return `${parsed.name} (${parsed.qty} pcs)`;
+            }).join(', ');
+
+            return {
+                'Order ID': order.id,
+                'Store ID': order.storeId || 'GLOBAL',
+                'Store Name': storeMap[order.storeId] || 'Global / N/A',
+                'Date': order.timestamp,
+                'Customer Name': order.name,
+                'Phone': order.phone,
+                'Address': order.address || 'Walk-in',
+                'Source': order.source || 'Walk-in',
+                'Account Type': order.cx_type || 'Residential',
+                'Customer Status': order.isRepeatCustomer ? 'Repeat Customer' : 'New Customer',
+                'Services': cleanServicesStr,
+                'Status': order.status,
+                'Gross Amount (₹)': grossAmount,
+                'Discount (%)': discountPct,
+                'Discount Amount (₹)': discountAmount,
+                'Payable Amount (₹)': netAmount
+            };
+        });
+
+        // 2. Generate Store Analytics Sheet
+        const storeAnalytics = Object.keys(storeMap).map(storeId => {
+            const storeOrders = finalOrders.filter(o => o.storeId === storeId);
+            const totalOrdersCount = storeOrders.length;
+            
+            let totalGross = 0;
+            let totalPayable = 0;
+            
+            storeOrders.forEach(o => {
+                const netAmount = Number(o.total) || 0;
+                const discountPct = Number(o.discount) || 0;
+                
+                let computedSubtotal = 0;
+                const sList = Array.isArray(o.services) ? o.services : (o.services ? String(o.services).split(',') : []);
+                sList.forEach(s => {
+                    computedSubtotal += parseService(s).price || 0;
+                });
+                
+                let grossAmount = computedSubtotal;
+                if (grossAmount <= 0) {
+                    if (discountPct > 0 && discountPct < 100) {
+                        grossAmount = netAmount / (1 - discountPct / 100);
+                    } else {
+                        grossAmount = netAmount;
+                    }
+                }
+                totalGross += grossAmount;
+                totalPayable += netAmount;
+            });
+            
+            return {
+                'Store ID': storeId,
+                'Store Name': storeMap[storeId],
+                'Total Orders': totalOrdersCount,
+                'Total Gross (₹)': Math.round(totalGross),
+                'Total Discount (₹)': Math.round(totalGross - totalPayable),
+                'Total Payable (₹)': Math.round(totalPayable)
+            };
+        }).filter(row => row['Total Orders'] > 0);
+
+        // 3. Generate Service Analytics Sheet
+        const serviceMapStats = {};
+        finalOrders.forEach(o => {
+            const sList = Array.isArray(o.services) ? o.services : (o.services ? String(o.services).split(',') : []);
+            const cleanServices = sList.map(s => parseService(s)).filter(s => s.name);
+            if (cleanServices.length === 0) return;
+            
+            const netAmount = Number(o.total) || 0;
+            const share = netAmount / cleanServices.length;
+            
+            cleanServices.forEach(s => {
+                const key = s.serviceType;
+                if (!serviceMapStats[key]) {
+                    serviceMapStats[key] = { count: 0, qty: 0, revenue: 0 };
+                }
+                serviceMapStats[key].count += 1;
+                serviceMapStats[key].qty += s.qty || 1;
+                serviceMapStats[key].revenue += share;
+            });
+        });
+        
+        const serviceAnalytics = Object.keys(serviceMapStats).map(name => ({
+            'Service Name': name,
+            'Total Orders': serviceMapStats[name].count,
+            'Total Pcs Quantity': serviceMapStats[name].qty,
+            'Proportional Revenue (₹)': Math.round(serviceMapStats[name].revenue)
+        })).sort((a, b) => b['Total Orders'] - a['Total Orders']);
+
+        // Write Sheets to Workbook
         const workbook = xlsx.utils.book_new();
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'Orders');
+        
+        const worksheetOrders = xlsx.utils.json_to_sheet(data);
+        const worksheetStore = xlsx.utils.json_to_sheet(storeAnalytics);
+        const worksheetService = xlsx.utils.json_to_sheet(serviceAnalytics);
+        
+        // Auto-fit Helper
+        const autofit = (worksheet, sheetData) => {
+            if (sheetData.length > 0) {
+                const colWidths = Object.keys(sheetData[0]).map(key => {
+                    const maxLen = Math.max(
+                        key.length,
+                        ...sheetData.map(row => String(row[key] ?? '').length)
+                    );
+                    return { wch: maxLen + 3 };
+                });
+                worksheet['!cols'] = colWidths;
+            }
+        };
+        
+        autofit(worksheetOrders, data);
+        autofit(worksheetStore, storeAnalytics);
+        autofit(worksheetService, serviceAnalytics);
+        
+        xlsx.utils.book_append_sheet(workbook, worksheetOrders, 'Orders Log');
+        if (storeAnalytics.length > 0) {
+            xlsx.utils.book_append_sheet(workbook, worksheetStore, 'Store Analytics');
+        }
+        if (serviceAnalytics.length > 0) {
+            xlsx.utils.book_append_sheet(workbook, worksheetService, 'Service Analytics');
+        }
         
         const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
         
-        res.setHeader('Content-Disposition', 'attachment; filename="Global_Orders_Report.xlsx"');
+        const filename = req.query.allTime === 'true' 
+            ? 'Total_Business_Report.xlsx' 
+            : `Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.send(buffer);
     } catch (error) {
+        console.error("Export error:", error);
         res.status(500).json({ error: 'Failed to generate Excel file' });
+    }
+});
+
+// AUTHENTICATED PUSH CAMPAIGN ENDPOINTS
+app.post('/api/notifications/send', verifyToken, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { targetType, targetId, title, body } = req.body;
+
+    if (!title || !body) {
+        return res.status(400).json({ error: 'Title and body are required' });
+    }
+
+    try {
+        let tokens = [];
+
+        if (targetType === 'all_customers') {
+            const customers = await Customer.find({ fcmToken: { $ne: null } }).select('fcmToken').lean();
+            tokens = customers.map(c => c.fcmToken);
+        } else if (targetType === 'all_riders') {
+            let filter = { fcmToken: { $ne: null } };
+            // If branch manager sends, they might only want to target riders in their own branch
+            if (req.user.role === 'manager') {
+                filter.storeId = req.user.id;
+            }
+            const riders = await Rider.find(filter).select('fcmToken').lean();
+            tokens = riders.map(r => r.fcmToken);
+        } else if (targetType === 'specific_customer') {
+            if (!targetId) return res.status(400).json({ error: 'Target Customer ID/Phone/Email required' });
+            
+            // Try matching phone, email, or name
+            const cleanPhone = targetId.replace(/\D/g, '').slice(-10);
+            const customer = await Customer.findOne({ 
+                $or: [
+                    { phone: cleanPhone.length === 10 ? cleanPhone : 'INVALID' }, 
+                    { email: targetId }, 
+                    { name: targetId }
+                ] 
+            }).select('fcmToken').lean();
+            if (customer && customer.fcmToken) tokens.push(customer.fcmToken);
+        } else if (targetType === 'specific_rider') {
+            if (!targetId) return res.status(400).json({ error: 'Target Rider ID required' });
+            const rider = await Rider.findOne({ id: targetId }).select('fcmToken').lean();
+            if (rider && rider.fcmToken) tokens.push(rider.fcmToken);
+        }
+
+        if (tokens.length === 0) {
+            return res.status(400).json({ error: 'No recipients found with valid FCM tokens' });
+        }
+
+        let sentCount = 0;
+        for (const token of tokens) {
+            try {
+                await sendNotification({
+                    token,
+                    title,
+                    body,
+                    data: { type: 'custom_alert' }
+                });
+                sentCount++;
+            } catch (err) {
+                console.error("FCM Send Error during campaign:", err.message);
+            }
+        }
+
+        // Save campaign log
+        const campaign = new Campaign({
+            title,
+            body,
+            targetType,
+            targetId: targetId || 'All',
+            sentCount,
+            totalCount: tokens.length
+        });
+        await campaign.save();
+
+        res.json({ status: 'success', sentCount, totalCount: tokens.length });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/campaigns', verifyToken, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    try {
+        const campaigns = await Campaign.find().sort({ _id: -1 }).limit(100).lean();
+        res.json(campaigns);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -19,6 +19,7 @@ type InvoiceEstimate = {
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
+import { PAYMENT_QR_BASE64 } from './paymentQrBase64';
 
 // --- INITIALIZATION ---
 
@@ -340,6 +341,8 @@ export default function ManagerPanel() {
   const [loading, setLoading] = useState(true);
   const [showWalkinModal, setShowWalkinModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showEODModal, setShowEODModal] = useState(false);
+  const [isExportingEODPdf, setIsExportingEODPdf] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [editOrderForm, setEditOrderForm] = useState<any>({
@@ -446,6 +449,104 @@ export default function ManagerPanel() {
   // Manual line inputs (manager-only): name, price, qty, type
   const [manualLine, setManualLine] = useState({ name: '', price: '', qty: 1, type: 'Product' as 'Product' | 'Service' });
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('lb_user_role') : null;
+
+  // Repeat Customer Search & Autofill State
+  const [cxSearchQuery, setCxSearchQuery] = useState('');
+  const [cxSuggestions, setCxSuggestions] = useState<any[]>([]);
+  const [isSearchingCx, setIsSearchingCx] = useState(false);
+  const [showCxDropdown, setShowCxDropdown] = useState(false);
+  const [recentRepeatCustomers, setRecentRepeatCustomers] = useState<any[]>([]);
+  const [selectedRepeatCustomer, setSelectedRepeatCustomer] = useState<any>(null);
+  const [detectedCustomer, setDetectedCustomer] = useState<any>(null);
+
+  const fetchRecentRepeatCustomers = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/customers/search?limit=6`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecentRepeatCustomers(data.customers || []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch recent repeat customers:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (showWalkinModal) {
+      fetchRecentRepeatCustomers();
+    }
+  }, [showWalkinModal]);
+
+  useEffect(() => {
+    if (!cxSearchQuery || cxSearchQuery.trim().length < 2) {
+      setCxSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingCx(true);
+      try {
+        const res = await fetch(`${API_BASE}/customers/search?q=${encodeURIComponent(cxSearchQuery.trim())}&limit=8`);
+        if (res.ok) {
+          const data = await res.json();
+          setCxSuggestions(data.customers || []);
+          setShowCxDropdown(true);
+        }
+      } catch (err) {
+        console.warn("Customer search failed:", err);
+      } finally {
+        setIsSearchingCx(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [cxSearchQuery]);
+
+  // Live phone number lookup when typing 10 digits directly into Phone field
+  useEffect(() => {
+    const clean = (walkinForm.phone || '').replace(/\D/g, '').slice(-10);
+    if (clean.length === 10 && (!selectedRepeatCustomer || selectedRepeatCustomer.phone !== clean)) {
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/customers/lookup?phone=${clean}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.found) {
+              setDetectedCustomer({
+                name: data.name,
+                phone: data.phone,
+                address: data.address,
+                accountType: data.accountType,
+                orderCount: data.pastOrders,
+                lastOrderDate: data.lastOrderDate,
+                isRepeat: data.isRepeat
+              });
+            } else {
+              setDetectedCustomer(null);
+            }
+          }
+        } catch (e) {
+          console.warn("Phone lookup error:", e);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    } else if (clean.length < 10) {
+      setDetectedCustomer(null);
+    }
+  }, [walkinForm.phone, selectedRepeatCustomer]);
+
+  const selectCustomer = (cx: any) => {
+    setSelectedRepeatCustomer(cx);
+    const hasAddress = Boolean(cx.address && cx.address.trim() && cx.address !== 'Store Walk-in' && cx.address !== 'Self Pickup');
+    setWalkinForm(prev => ({
+      ...prev,
+      name: cx.name || prev.name,
+      phone: cx.phone || prev.phone,
+      cx_type: cx.accountType || prev.cx_type || 'Residential',
+      address: hasAddress ? cx.address : (prev.address || '')
+    }));
+    setShowCxDropdown(false);
+    setCxSearchQuery('');
+    setDetectedCustomer(null);
+  };
 
   const recalcTotal = (services: { name: string, price: number, qty: number }[], discountPct: string, totalMode?: string, adjustment?: string) => {
     const subtotal = services.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
@@ -860,6 +961,302 @@ export default function ManagerPanel() {
     }
   };
 
+  const exportInventoryExcel = () => {
+    try {
+      if (!inventory || inventory.length === 0) {
+        alert("No inventory records found to export.");
+        return;
+      }
+
+      const generatedOn = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+      // 1. Stock Sheet
+      const stockData = inventory.map((item, idx) => {
+        const qty = Number(item.quantity) || 0;
+        let status = 'In Stock';
+        let alertLevel = 'Healthy Stock';
+        if (qty <= 0) {
+          status = 'Out of Stock';
+          alertLevel = 'CRITICAL - Stock Empty';
+        } else if (qty <= 10) {
+          status = 'Low Stock';
+          alertLevel = 'WARNING - Refill Required';
+        }
+
+        return {
+          'S.No': idx + 1,
+          'Branch Name': storeName || 'Main Branch',
+          'Branch ID': storeId,
+          'Material Item': item.item || 'N/A',
+          'Current Quantity': qty,
+          'Unit': item.unit || 'Units',
+          'Stock Status': status,
+          'Threshold Alert': alertLevel,
+          'Last Updated': item.lastUpdated || 'N/A',
+          'Report Generated At': generatedOn
+        };
+      });
+
+      const wsStock = XLSX.utils.json_to_sheet(stockData);
+      wsStock['!cols'] = [
+        { wch: 6 },  // S.No
+        { wch: 22 }, // Branch Name
+        { wch: 14 }, // Branch ID
+        { wch: 26 }, // Material Item
+        { wch: 18 }, // Current Quantity
+        { wch: 10 }, // Unit
+        { wch: 14 }, // Stock Status
+        { wch: 26 }, // Threshold Alert
+        { wch: 24 }, // Last Updated
+        { wch: 24 }  // Report Generated At
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsStock, "Inventory_Stock");
+
+      // 2. Stock Requests Sheet
+      if (stockRequests && stockRequests.length > 0) {
+        const requestData = stockRequests.map((req, idx) => ({
+          'S.No': idx + 1,
+          'Request ID': req.id || `REQ-${idx + 1}`,
+          'Branch Name': req.storeName || storeName || 'Main Branch',
+          'Branch ID': req.storeId || storeId,
+          'Requested Item': req.item || 'N/A',
+          'Requested Quantity': Number(req.quantity) || 0,
+          'Unit': req.unit || 'kg',
+          'Approval Status': req.status || 'Pending',
+          'Date Requested': req.createdAt || req.timestamp ? new Date(req.createdAt || req.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A',
+          'Notes / Justification': req.notes || '-'
+        }));
+
+        const wsReq = XLSX.utils.json_to_sheet(requestData);
+        wsReq['!cols'] = [
+          { wch: 6 },  // S.No
+          { wch: 16 }, // Request ID
+          { wch: 22 }, // Branch Name
+          { wch: 14 }, // Branch ID
+          { wch: 26 }, // Requested Item
+          { wch: 18 }, // Requested Quantity
+          { wch: 10 }, // Unit
+          { wch: 16 }, // Approval Status
+          { wch: 24 }, // Date Requested
+          { wch: 30 }  // Notes
+        ];
+        XLSX.utils.book_append_sheet(wb, wsReq, "Stock_Requests_History");
+      }
+
+      const cleanStoreName = (storeName || 'Branch').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Inventory_Report_${cleanStoreName}_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error("Export Inventory error:", err);
+      alert("Failed to export Inventory report: " + err);
+    }
+  };
+
+  const exportEODGraphPDF = async () => {
+    const reportElement = document.getElementById('eod-printable-report');
+    if (!reportElement) return;
+    setIsExportingEODPdf(true);
+    try {
+      const todayIsoStr = new Date().toISOString().split('T')[0];
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        onclone: (clonedDoc) => {
+          const report = clonedDoc.getElementById('eod-printable-report');
+          if (report) {
+            const dummyCanvas = clonedDoc.createElement('canvas');
+            dummyCanvas.width = dummyCanvas.height = 1;
+            const ctx = dummyCanvas.getContext('2d');
+            const toRgb = (colorStr: string) => {
+              if (!colorStr || colorStr === 'transparent' || colorStr === 'inherit' || colorStr === 'initial') return colorStr;
+              try {
+                if (!ctx) return '#1e293b';
+                ctx.fillStyle = '#000000';
+                ctx.fillStyle = colorStr;
+                return ctx.fillStyle;
+              } catch (e) {
+                return '#1e293b';
+              }
+            };
+
+            const elements = report.querySelectorAll('*');
+            elements.forEach((node) => {
+              const el = node as HTMLElement;
+              if (!el.style) return;
+              const computed = clonedDoc.defaultView?.getComputedStyle(el);
+              if (computed) {
+                if (computed.color && (computed.color.includes('lab') || computed.color.includes('oklch'))) {
+                  el.style.color = toRgb(computed.color);
+                }
+                if (computed.backgroundColor && (computed.backgroundColor.includes('lab') || computed.backgroundColor.includes('oklch'))) {
+                  el.style.backgroundColor = toRgb(computed.backgroundColor);
+                }
+                if (computed.borderColor && (computed.borderColor.includes('lab') || computed.borderColor.includes('oklch'))) {
+                  el.style.borderColor = toRgb(computed.borderColor);
+                }
+              }
+            });
+          }
+
+          // Strip/replace modern color functions from all stylesheet tags
+          const styles = clonedDoc.querySelectorAll('style');
+          styles.forEach(s => {
+            if (s.textContent && (s.textContent.includes('lab(') || s.textContent.includes('oklch('))) {
+              s.textContent = s.textContent
+                .replace(/lab\([^)]+\)/gi, '#1e293b')
+                .replace(/oklch\([^)]+\)/gi, '#3b82f6');
+            }
+          });
+        }
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdfWidth = 800;
+      const pdfHeight = canvas.height * (pdfWidth / canvas.width);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [pdfWidth, pdfHeight]
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`EOD_Report_Graph_${storeId}_${todayIsoStr}.pdf`);
+    } catch (e: any) {
+      alert('Error generating EOD Graph PDF: ' + (e?.message || String(e)));
+    } finally {
+      setIsExportingEODPdf(false);
+    }
+  };
+
+  const exportEODReport = () => {
+    try {
+      const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const todayIsoStr = new Date().toISOString().split('T')[0];
+
+      // Filter today's orders by timestamp or order_date
+      const todayOrders = orders.filter(o => {
+        const ts = String(o.timestamp || o.order_date || '');
+        return ts.includes(todayDateStr) || ts.includes(todayIsoStr);
+      });
+
+      // Compute EOD stats
+      const totalOrders = todayOrders.length;
+      const totalRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const receivedRevenue = todayOrders
+        .filter(o => o.paymentStatus === 'Received' || o.payment_status === 'Received')
+        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const pendingRevenue = totalRevenue - receivedRevenue;
+
+      const cashRevenue = todayOrders
+        .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Cash' || o.payment_mode === 'Cash'))
+        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+      const onlineRevenue = todayOrders
+        .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Online QR' || o.paymentMode === 'Online' || o.payment_mode === 'Online'))
+        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+      const deliveredCount = todayOrders.filter(o => ['delivered', 'delivered to cx', 'completed'].includes(String(o.status).toLowerCase())).length;
+      const inProcessCount = todayOrders.filter(o => ['processing', 'washing', 'drying', 'ironing'].includes(String(o.status).toLowerCase())).length;
+      const pendingCount = todayOrders.filter(o => ['pending', 'out for pickup', 'pickup done', 'delivered at store'].includes(String(o.status).toLowerCase())).length;
+
+      const totalCollected = cashRevenue + onlineRevenue;
+      const cashCollectedPct = totalCollected > 0 ? Math.round((cashRevenue / totalCollected) * 100) : 0;
+      const onlineCollectedPct = totalCollected > 0 ? (100 - cashCollectedPct) : 0;
+
+      // Repeat Customer Stats for Excel
+      const custHistoryMap: Record<string, number> = {};
+      orders.forEach(o => {
+        const p = (o.phone || o.mobile_number || '').replace(/\D/g, '').slice(-10);
+        if (p) custHistoryMap[p] = (custHistoryMap[p] || 0) + 1;
+      });
+      let repOrders = 0;
+      let newOrders = 0;
+      let repRev = 0;
+      let newRev = 0;
+      todayOrders.forEach(o => {
+        const p = (o.phone || o.mobile_number || '').replace(/\D/g, '').slice(-10);
+        if (o.isRepeatCustomer || (custHistoryMap[p] || 0) > 1) {
+          repOrders++;
+          repRev += (Number(o.total) || 0);
+        } else {
+          newOrders++;
+          newRev += (Number(o.total) || 0);
+        }
+      });
+      const repRate = totalOrders > 0 ? Math.round((repOrders / totalOrders) * 100) : 0;
+
+      // Forecast for Excel
+      const recDays = dailyEarningsData.slice(-7);
+      const avgOrders = recDays.length > 0 ? (recDays.reduce((s, d) => s + d.count, 0) / recDays.length) : (totalOrders || 4);
+      const avgRev = recDays.length > 0 ? (recDays.reduce((s, d) => s + d.amount, 0) / recDays.length) : (totalRevenue || 2000);
+      const tomDay = (new Date().getDay() + 1) % 7;
+      const dFactor = (tomDay === 0 || tomDay === 6) ? 1.25 : 1.05;
+      const pOrdMin = Math.max(1, Math.round(avgOrders * 0.9 * dFactor));
+      const pOrdMax = Math.max(pOrdMin + 2, Math.round(avgOrders * 1.35 * dFactor));
+      const pRevMin = Math.round(avgRev * 0.9 * dFactor);
+      const pRevMax = Math.round(avgRev * 1.35 * dFactor);
+
+      // 1. Summary Sheet
+      const summaryData = [
+        { 'Metric': 'Store Name', 'Value': storeName },
+        { 'Metric': 'Store ID', 'Value': storeId },
+        { 'Metric': 'Report Date', 'Value': todayDateStr },
+        { 'Metric': 'Generated At', 'Value': new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) },
+        { 'Metric': '-------------------------', 'Value': '-------------------------' },
+        { 'Metric': 'Total Orders Today', 'Value': totalOrders },
+        { 'Metric': 'Orders Delivered / Completed', 'Value': deliveredCount },
+        { 'Metric': 'Orders In Process', 'Value': inProcessCount },
+        { 'Metric': 'Orders Pending / Pickup', 'Value': pendingCount },
+        { 'Metric': '-------------------------', 'Value': '-------------------------' },
+        { 'Metric': 'Total Day Revenue (₹)', 'Value': `₹${totalRevenue.toLocaleString('en-IN')}` },
+        { 'Metric': 'Total Collected Revenue (₹)', 'Value': `₹${totalCollected.toLocaleString('en-IN')}` },
+        { 'Metric': 'Total Cash Collected (₹)', 'Value': `₹${cashRevenue.toLocaleString('en-IN')}` },
+        { 'Metric': 'Total Online / QR Collected (₹)', 'Value': `₹${onlineRevenue.toLocaleString('en-IN')}` },
+        { 'Metric': 'Cash vs Online Ratio', 'Value': `${cashCollectedPct}% Cash / ${onlineCollectedPct}% Online` },
+        { 'Metric': 'Total Pending Amount (₹)', 'Value': `₹${pendingRevenue.toLocaleString('en-IN')}` },
+        { 'Metric': '-------------------------', 'Value': '-------------------------' },
+        { 'Metric': 'Repeat Customer Rate', 'Value': `${repRate}% (${repOrders} repeat orders)` },
+        { 'Metric': 'Repeat Customer Revenue (₹)', 'Value': `₹${repRev.toLocaleString('en-IN')}` },
+        { 'Metric': 'New Customer Orders', 'Value': `${newOrders} (₹${newRev.toLocaleString('en-IN')})` },
+        { 'Metric': '-------------------------', 'Value': '-------------------------' },
+        { 'Metric': 'Predicted Orders Tomorrow', 'Value': `${pOrdMin} - ${pOrdMax} Orders` },
+        { 'Metric': 'Projected Revenue Tomorrow', 'Value': `₹${pRevMin.toLocaleString('en-IN')} - ₹${pRevMax.toLocaleString('en-IN')}` },
+      ];
+
+      // 2. Orders Detail Sheet
+      const ordersData = todayOrders.map((o, idx) => ({
+        'S.No': idx + 1,
+        'Order ID': o.id || o.customer_id,
+        'Time': o.timestamp || o.order_date || '-',
+        'Customer Name': o.name || o.customer_name || '-',
+        'Phone': o.phone || o.mobile_number || '-',
+        'Address': o.address || '-',
+        'Services': Array.isArray(o.services) ? o.services.join(', ') : o.services || o.items_ordered || '-',
+        'Total Amount (₹)': Number(o.total) || 0,
+        'Payment Status': o.paymentStatus || o.payment_status || 'Pending',
+        'Payment Mode': o.paymentMode || o.payment_mode || '-',
+        'Order Status': o.status || 'Pending',
+        'Pickup Rider': o.assignedRiderId ? (riders.find(r => r.id === o.assignedRiderId)?.name || o.assignedRiderId) : '-',
+        'Pickup Photo': o.pickupPhoto ? 'Uploaded' : 'No',
+        'Delivery Photo': o.deliveryPhoto ? 'Uploaded' : 'No'
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+
+      XLSX.utils.book_append_sheet(wb, wsSummary, "EOD Summary");
+      XLSX.utils.book_append_sheet(wb, wsOrders, "Today's Orders Detail");
+
+      XLSX.writeFile(wb, `EOD_Report_${storeId}_${todayIsoStr}.xlsx`);
+    } catch (err) {
+      alert("Failed to export EOD Report.");
+      console.error(err);
+    }
+  };
+
   const assignRider = async (orderId: string, riderId: string) => {
     try {
       const token = localStorage.getItem('lb_auth_token');
@@ -1023,6 +1420,10 @@ export default function ManagerPanel() {
         trackEvent('walkin_order_created', { total: newOrder.total, services: newOrder.services });
         setShowWalkinModal(false);
         setWalkinForm({ name: '', phone: '', selectedServices: [], total: '0', totalMode: 'auto', adjustment: '', timestamp: '', searchQuery: '', discount: '0', source: 'Walk-in', address: '', cx_type: 'Residential' });
+        setSelectedRepeatCustomer(null);
+        setDetectedCustomer(null);
+        setCxSearchQuery('');
+        setShowCxDropdown(false);
         fetchOrders();
         setSelectedOrder(createdOrder);
         setShowInvoiceModal(true);
@@ -1332,6 +1733,14 @@ export default function ManagerPanel() {
           <span style="font-size: 44px; font-weight: 900;">Rs ${order.total.toFixed(2)}</span>
         </div>
 
+        <div style="margin-top: 36px; text-align: center; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 24px; background: #f8fafc;">
+          <div style="font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #1e293b; margin-bottom: 12px;">SCAN & PAY VIA UPI</div>
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="${PAYMENT_QR_BASE64}" style="width: 180px; height: 180px; object-fit: contain; border-radius: 12px; border: 1.5px solid #cbd5e1; background: #fff; padding: 6px;" />
+          </div>
+          <div style="font-size: 20px; font-weight: 700; color: #64748b; margin-top: 12px;">Accepting GPay, PhonePe, Paytm & all UPI Apps</div>
+        </div>
+
         <div style="text-align: center; margin-top: 60px; font-size: 22px; font-weight: 700; color: #666; font-style: italic;">
           Thank you for choosing Laundry Basket! Visit again soon.
         </div>
@@ -1491,6 +1900,9 @@ export default function ManagerPanel() {
       }
     } catch (e) { console.error("Logo fetch failed", e); }
 
+    // Use bundled Base64 payment QR to ensure 100% instant visibility in print dialog without network dependency
+    const qrBase64 = PAYMENT_QR_BASE64;
+
     const servicesList = Array.isArray(order.services)
       ? order.services
       : String(order.services).split(',').map((s: string) => s.trim());
@@ -1534,11 +1946,11 @@ export default function ManagerPanel() {
       </tr>`
     ).join('');
 
-    const w = window.open('', '_blank', 'width=302,height=600');
+    const w = window.open('', '_blank', 'width=302,height=900,scrollbars=yes');
     if (!w) return;
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Receipt-${order.id} (V4)</title>
+<title>Receipt-${order.id} (v5.0.0)</title>
 <style>
   @page { size: 80mm auto; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1607,6 +2019,15 @@ export default function ManagerPanel() {
     <span class="bold" style="font-size: 18px;">₹${order.total}</span>
   </div>
 
+  <div class="dash"></div>
+  <div class="center" style="margin: 10px 0;">
+    <div class="bold" style="font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">SCAN & PAY VIA UPI</div>
+    <div style="display:flex; justify-content:center; align-items:center; margin: 4px auto;">
+      <img id="qr-img" src="${qrBase64}" style="width:130px;height:130px;object-fit:contain;border-radius:8px;border:1px solid #ccc;padding:2px;" alt="UPI QR" />
+    </div>
+    <div style="font-size: 10px; color: #444; margin-top: 5px; font-weight: 700;">GPay • PhonePe • Paytm • UPI</div>
+  </div>
+
   <div style="background-color: #dcfce7; padding: 12px; text-align: center; margin: 15px 0; border-radius: 8px;">
     <div style="font-size: 11px; font-weight: 900; color: #166534; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;">
       TRACK & BOOK EASILY
@@ -1626,7 +2047,7 @@ export default function ManagerPanel() {
     <div style="font-size: 11px; color: #666;">*** CUSTOMER COPY ***</div>
   </div>
 
-<script>window.onload = () => { setTimeout(() => { window.print(); }, 800); }<\/script>
+<script>(function(){var img=document.getElementById('qr-img');var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.print();},300);}if(img&&img.complete&&img.naturalWidth>0){go();}else if(img){img.onload=go;img.onerror=go;setTimeout(go,1500);}else{setTimeout(go,800);}})();<\/script>
 </body></html>`);
     w.document.close();
   };
@@ -1705,11 +2126,23 @@ export default function ManagerPanel() {
         <aside className="manager-sidebar w-64 glass m-4 mr-0 p-6 flex flex-col gap-8">
           <div className="manager-brand flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden bg-white">
-              <img src="/manager/logo.png" alt="LB" className="w-full h-full object-contain p-1" />
+              <img
+                src="/manager/logo.png"
+                alt="LB"
+                className="w-full h-full object-contain p-1"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.style.display = 'none';
+                  const badge = target.parentElement?.querySelector('.lb-fallback-badge') as HTMLElement | null;
+                  if (badge) badge.style.display = 'flex';
+                }}
+              />
+              <span className="lb-fallback-badge hidden w-full h-full items-center justify-center text-xs font-black text-primary">LB</span>
             </div>
             <div>
               <h1 className="text-lg font-black tracking-tight leading-tight uppercase">Branch Manager</h1>
               <p className="text-[9px] text-text-secondary font-black uppercase tracking-widest">Laundry Basket</p>
+              <p className="text-[8px] text-text-secondary font-medium tracking-widest opacity-60">Unit of Everika</p>
             </div>
           </div>
 
@@ -1813,6 +2246,13 @@ export default function ManagerPanel() {
 
               {activeTab === 'inventory' && (
                 <div className="manager-action-group flex gap-3">
+                  <button 
+                    className="glass hover:bg-white/60 px-6 py-4 rounded-2xl flex items-center gap-2 text-text-primary font-black border border-black/5 shadow-sm transition-all"
+                    onClick={exportInventoryExcel}
+                    title="Export Detailed Inventory & Stock Request Report in Excel"
+                  >
+                    <span>📊</span> Export Excel Report
+                  </button>
                   <button className="btn-primary bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-none shadow-lg shadow-indigo-500/25 px-6 py-4 rounded-2xl flex items-center gap-2 text-white font-black" onClick={() => {
                     setStockRequestForm({ item: '', quantity: '', unit: 'kg', notes: '' });
                     setShowStockRequestModal(true);
@@ -1832,6 +2272,13 @@ export default function ManagerPanel() {
                   <span className="text-xl">+</span> Walk-in
                 </button>
               )}
+              <button 
+                className="btn-primary bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-none shadow-lg shadow-emerald-500/20 px-5 py-4 rounded-2xl flex items-center gap-2 text-white font-black text-xs uppercase tracking-wider transition-all"
+                onClick={() => setShowEODModal(true)}
+                title="View & Export End of Day Graphic Report"
+              >
+                <span className="text-base">📊</span> Export EOD Report
+              </button>
             </div>
           </header>
 
@@ -2305,6 +2752,13 @@ export default function ManagerPanel() {
                 </div>
                 <div className="flex items-center gap-4">
                   <button
+                    className="btn-primary bg-emerald-600 hover:bg-emerald-700 px-6 py-4 rounded-3xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all"
+                    onClick={() => setShowEODModal(true)}
+                    title="View & Export Complete End of Day Graphic Report"
+                  >
+                    <span className="text-lg">📊</span> Export EOD Report
+                  </button>
+                  <button
                     className="btn-primary bg-green-500 hover:bg-green-600 px-6 py-4 rounded-3xl flex items-center gap-2 shadow-lg text-white transition-all"
                     onClick={exportTodayExcel}
                   >
@@ -2610,19 +3064,28 @@ export default function ManagerPanel() {
                 </div>
               </div>
 
-              {/* Sub-tab Navigation */}
-              <div className="flex gap-2 bg-white/40 p-1.5 rounded-2xl border border-white/50 shadow-inner w-fit">
+              {/* Sub-tab Navigation & Actions */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex gap-2 bg-white/40 p-1.5 rounded-2xl border border-white/50 shadow-inner w-fit">
+                  <button
+                    onClick={() => setInventorySubTab('stock')}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'stock' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'hover:bg-white/50 text-text-secondary'}`}
+                  >
+                    📦 Current Stock
+                  </button>
+                  <button
+                    onClick={() => setInventorySubTab('requests')}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'requests' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'hover:bg-white/50 text-text-secondary'}`}
+                  >
+                    ⏳ Request History
+                  </button>
+                </div>
                 <button
-                  onClick={() => setInventorySubTab('stock')}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'stock' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'hover:bg-white/50 text-text-secondary'}`}
+                  onClick={exportInventoryExcel}
+                  className="glass px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-white/60 transition-all flex items-center gap-2 text-primary border border-primary/20 shadow-sm"
+                  title="Download complete detailed inventory report in Excel (.xlsx)"
                 >
-                  📦 Current Stock
-                </button>
-                <button
-                  onClick={() => setInventorySubTab('requests')}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inventorySubTab === 'requests' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'hover:bg-white/50 text-text-secondary'}`}
-                >
-                  ⏳ Request History
+                  <span className="text-base">📊</span> Export Excel Report (.xlsx)
                 </button>
               </div>
 
@@ -2830,9 +3293,171 @@ export default function ManagerPanel() {
         {showWalkinModal && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className="glass-card w-full max-w-xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
+              <h3 className="text-2xl font-black mb-4 flex items-center gap-3">
                 <span className="text-primary text-3xl">🧺</span> Manual / Walk-in Order
               </h3>
+
+              {/* Repeat Customer Quick Search & Selection Bar */}
+              <div className="mb-5 p-4 rounded-2xl bg-primary/5 border border-primary/20 relative">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[11px] font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
+                    <span>⚡</span> Find Existing / Repeat Customer
+                  </label>
+                  {selectedRepeatCustomer && (
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                      ✓ Profile Loaded
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                      <input
+                        type="text"
+                        className="w-full bg-white dark:bg-black/40 border border-primary/25 rounded-xl pl-9 pr-8 py-2.5 text-xs font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-gray-400"
+                        placeholder="Search by phone (e.g. 98260...) or customer name..."
+                        value={cxSearchQuery}
+                        onChange={e => {
+                          setCxSearchQuery(e.target.value);
+                          setShowCxDropdown(true);
+                        }}
+                        onFocus={() => {
+                          if (cxSuggestions.length > 0 || recentRepeatCustomers.length > 0) {
+                            setShowCxDropdown(true);
+                          }
+                        }}
+                      />
+                      {cxSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCxSearchQuery('');
+                            setCxSuggestions([]);
+                            setShowCxDropdown(false);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {isSearchingCx && (
+                      <span className="text-xs text-primary animate-spin">⏳</span>
+                    )}
+                  </div>
+
+                  {/* Autocomplete Suggestions Dropdown */}
+                  {showCxDropdown && (cxSuggestions.length > 0 || (cxSearchQuery.length === 0 && recentRepeatCustomers.length > 0)) && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto custom-scrollbar">
+                      <div className="p-2 border-b border-gray-100 dark:border-gray-800 text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center justify-between">
+                        <span>{cxSearchQuery.length > 0 ? `Matching Customers (${cxSuggestions.length})` : 'Frequent / Repeat Customers'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCxDropdown(false)}
+                          className="hover:text-red-500 text-[10px]"
+                        >
+                          Close ✕
+                        </button>
+                      </div>
+                      {(cxSearchQuery.length > 0 ? cxSuggestions : recentRepeatCustomers).map((cx: any) => (
+                        <button
+                          key={cx.phone}
+                          type="button"
+                          onClick={() => selectCustomer(cx)}
+                          className="w-full text-left p-2.5 hover:bg-primary/10 dark:hover:bg-primary/20 transition-colors flex items-center justify-between border-b border-gray-50 dark:border-gray-800/50 last:border-b-0"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                              {cx.name || 'Customer'}
+                              {cx.orderCount > 1 && (
+                                <span className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[9px] font-black px-1.5 py-0.2 rounded">
+                                  ⭐ {cx.orderCount} Orders
+                                </span>
+                              )}
+                              {cx.orderCount === 1 && (
+                                <span className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[9px] font-black px-1.5 py-0.2 rounded">
+                                  1 Order
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-0.5">
+                              <span>📞 {cx.phone}</span>
+                              {cx.accountType && <span className="text-[9px] opacity-75">({cx.accountType})</span>}
+                            </span>
+                            {cx.address && (
+                              <span className="text-[10px] text-gray-400 truncate max-w-[280px]">
+                                📍 {cx.address}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-black text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                            Select ↵
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Chips of Frequent Repeat Customers */}
+                {recentRepeatCustomers.length > 0 && !selectedRepeatCustomer && (
+                  <div className="mt-2.5">
+                    <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-1 flex items-center gap-1">
+                      <span>⚡ Frequent Repeat Customers:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentRepeatCustomers.slice(0, 5).map((cx: any) => (
+                        <button
+                          key={cx.phone}
+                          type="button"
+                          onClick={() => selectCustomer(cx)}
+                          className="bg-white/90 dark:bg-black/40 border border-primary/20 hover:border-primary text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 hover:bg-primary/10 shadow-sm"
+                        >
+                          <span>👤 {cx.name?.split(' ')[0] || 'Customer'}</span>
+                          <span className="text-primary font-black">({cx.orderCount || 1}★)</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active Selected Repeat Customer Banner */}
+                {selectedRepeatCustomer && (
+                  <div className="mt-3 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-sm">
+                        ⭐
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-gray-900 dark:text-gray-100">
+                            {selectedRepeatCustomer.name}
+                          </span>
+                          <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                            {selectedRepeatCustomer.orderCount} Past {selectedRepeatCustomer.orderCount === 1 ? 'Order' : 'Orders'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-600 dark:text-gray-300 mt-0.5">
+                          📞 {selectedRepeatCustomer.phone}
+                          {selectedRepeatCustomer.lastOrderDate ? ` • Last: ${selectedRepeatCustomer.lastOrderDate}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRepeatCustomer(null);
+                      }}
+                      className="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-all"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Customer Name</label>
@@ -2845,7 +3470,18 @@ export default function ManagerPanel() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Phone Number</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Phone Number</label>
+                    {detectedCustomer && !selectedRepeatCustomer && (
+                      <button
+                        type="button"
+                        onClick={() => selectCustomer(detectedCustomer)}
+                        className="text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md transition-colors animate-pulse"
+                      >
+                        ✨ Found: {detectedCustomer.name} ({detectedCustomer.orderCount} Orders) [Auto-fill]
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="tel"
                     className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-3 outline-none focus:border-primary transition-colors"
@@ -3133,7 +3769,19 @@ export default function ManagerPanel() {
               </div>
               <div className="flex gap-3 mt-8">
                 <button className="btn-primary flex-1 py-4 shadow-xl shadow-primary/30" onClick={handleSaveWalkin}>Place Order</button>
-                <button className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-text-secondary hover:text-red-500 transition-colors" onClick={() => setShowWalkinModal(false)}>Cancel</button>
+                <button
+                  type="button"
+                  className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-text-secondary hover:text-red-500 transition-colors"
+                  onClick={() => {
+                    setShowWalkinModal(false);
+                    setSelectedRepeatCustomer(null);
+                    setDetectedCustomer(null);
+                    setCxSearchQuery('');
+                    setShowCxDropdown(false);
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -3801,6 +4449,13 @@ export default function ManagerPanel() {
                   })()}
                 </div>
 
+                {/* UPI QR Payment Block */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 flex flex-col items-center justify-center text-center">
+                  <p className="text-[10px] font-black uppercase text-text-primary tracking-widest mb-2">Scan & Pay via UPI</p>
+                  <img src={PAYMENT_QR_BASE64} alt="UPI QR" className="w-36 h-36 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-sm" />
+                  <p className="text-[9px] font-bold text-text-secondary mt-2">GPay • PhonePe • Paytm • Any UPI App</p>
+                </div>
+
                 {/* Play Store Download Banner */}
                 <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 mb-6 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] font-black uppercase text-green-700 tracking-widest mb-1">Track & Book easily</p>
@@ -3811,6 +4466,43 @@ export default function ManagerPanel() {
                     Download App from Play Store
                   </div>
                 </div>
+
+                {/* Proof of Service Photos */}
+                {(selectedOrder.pickupPhoto || selectedOrder.deliveryPhoto) && (
+                  <div className="mb-6 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider mb-3">📸 Proof of Service Photos</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedOrder.pickupPhoto && (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-black uppercase text-primary">📦 Pickup Proof</span>
+                          <a 
+                            href={selectedOrder.pickupPhoto} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="block rounded-xl overflow-hidden border border-black/10 hover:border-primary transition-all group relative bg-black"
+                          >
+                            <img src={selectedOrder.pickupPhoto} alt="Pickup Proof" className="w-full h-28 object-cover group-hover:opacity-90" />
+                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">View Full ↗</span>
+                          </a>
+                        </div>
+                      )}
+                      {selectedOrder.deliveryPhoto && (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] font-black uppercase text-green-700">✅ Delivery Proof</span>
+                          <a 
+                            href={selectedOrder.deliveryPhoto} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="block rounded-xl overflow-hidden border border-black/10 hover:border-green-600 transition-all group relative bg-black"
+                          >
+                            <img src={selectedOrder.deliveryPhoto} alt="Delivery Proof" className="w-full h-28 object-cover group-hover:opacity-90" />
+                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">View Full ↗</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-5 gap-2">
@@ -3849,6 +4541,564 @@ export default function ManagerPanel() {
             </div>
           </div>
         )}
+
+        {/* EOD Report with Graphs Modal */}
+        {showEODModal && (() => {
+          const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+          const todayIsoStr = new Date().toISOString().split('T')[0];
+
+          // Filter today's orders
+          const todayOrders = orders.filter(o => {
+            const ts = String(o.timestamp || o.order_date || '');
+            return ts.includes(todayDateStr) || ts.includes(todayIsoStr);
+          });
+
+          const totalOrders = todayOrders.length;
+          const totalRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+          const receivedRevenue = todayOrders
+            .filter(o => o.paymentStatus === 'Received' || o.payment_status === 'Received')
+            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+          const pendingRevenue = Math.max(0, totalRevenue - receivedRevenue);
+
+          const cashRevenue = todayOrders
+            .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Cash' || o.payment_mode === 'Cash'))
+            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+          const onlineRevenue = todayOrders
+            .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Online QR' || o.paymentMode === 'Online' || o.payment_mode === 'Online'))
+            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+          const deliveredCount = todayOrders.filter(o => ['delivered', 'delivered to cx', 'completed'].includes(String(o.status).toLowerCase())).length;
+          const inProcessCount = todayOrders.filter(o => ['processing', 'washing', 'drying', 'ironing'].includes(String(o.status).toLowerCase())).length;
+          const pendingCount = todayOrders.filter(o => ['pending', 'out for pickup', 'pickup done', 'delivered at store'].includes(String(o.status).toLowerCase())).length;
+
+          // 1. Hourly Breakdown (08:00 to 22:00 in 5 slots)
+          const timeSlots = [
+            { label: 'Morning (8-11 AM)', range: [8, 11], count: 0, revenue: 0 },
+            { label: 'Mid-day (11-2 PM)', range: [11, 14], count: 0, revenue: 0 },
+            { label: 'Afternoon (2-5 PM)', range: [14, 17], count: 0, revenue: 0 },
+            { label: 'Evening (5-8 PM)', range: [17, 20], count: 0, revenue: 0 },
+            { label: 'Night (8-10 PM)', range: [20, 23], count: 0, revenue: 0 },
+          ];
+
+          todayOrders.forEach(o => {
+            let hour = 12;
+            try {
+              const d = new Date(o.timestamp);
+              if (!isNaN(d.getTime())) hour = d.getHours();
+            } catch (_) {}
+            const slot = timeSlots.find(s => hour >= s.range[0] && hour < s.range[1]) || timeSlots[1];
+            slot.count += 1;
+            slot.revenue += Number(o.total) || 0;
+          });
+
+          const maxSlotCount = Math.max(...timeSlots.map(s => s.count), 1);
+
+          // 2. Services Breakdown
+          const serviceCounts: Record<string, number> = {};
+          todayOrders.forEach(o => {
+            const raw = Array.isArray(o.services) ? o.services : String(o.services || '').split(',');
+            raw.forEach((s: any) => {
+              const name = String(s).replace(/^\d+\s*x\s*/, '').replace(/\(₹\d+\)/, '').trim() || 'General Laundry';
+              serviceCounts[name] = (serviceCounts[name] || 0) + 1;
+            });
+          });
+          const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const maxServiceCount = Math.max(...sortedServices.map(s => s[1]), 1);
+
+          // 3. Payment percentages & Cash vs Online Split
+          const totalCollected = cashRevenue + onlineRevenue;
+          const cashPct = totalRevenue > 0 ? Math.round((cashRevenue / totalRevenue) * 100) : 0;
+          const onlinePct = totalRevenue > 0 ? Math.round((onlineRevenue / totalRevenue) * 100) : 0;
+          const pendingPct = totalRevenue > 0 ? Math.max(0, 100 - (cashPct + onlinePct)) : 0;
+          const cashCollectedPct = totalCollected > 0 ? Math.round((cashRevenue / totalCollected) * 100) : 0;
+          const onlineCollectedPct = totalCollected > 0 ? (100 - cashCollectedPct) : 0;
+
+          // 4. Repeat Customer Rate
+          const customerOrderHistoryMap: Record<string, number> = {};
+          orders.forEach(o => {
+            const p = (o.phone || o.mobile_number || '').replace(/\D/g, '').slice(-10);
+            if (p) customerOrderHistoryMap[p] = (customerOrderHistoryMap[p] || 0) + 1;
+          });
+
+          let repeatCxOrdersCount = 0;
+          let newCxOrdersCount = 0;
+          let repeatCxRevenue = 0;
+          let newCxRevenue = 0;
+
+          todayOrders.forEach(o => {
+            const p = (o.phone || o.mobile_number || '').replace(/\D/g, '').slice(-10);
+            const totalCount = customerOrderHistoryMap[p] || 0;
+            const isRepeat = Boolean(o.isRepeatCustomer || totalCount > 1);
+            if (isRepeat) {
+              repeatCxOrdersCount++;
+              repeatCxRevenue += (Number(o.total) || 0);
+            } else {
+              newCxOrdersCount++;
+              newCxRevenue += (Number(o.total) || 0);
+            }
+          });
+
+          const repeatRatePct = totalOrders > 0 ? Math.round((repeatCxOrdersCount / totalOrders) * 100) : 0;
+          const newRatePct = totalOrders > 0 ? (100 - repeatRatePct) : 0;
+
+          // 5. Prediction Engine for Tomorrow
+          const recentDays = dailyEarningsData.slice(-7);
+          const avgDailyOrders = recentDays.length > 0 
+            ? (recentDays.reduce((sum, d) => sum + d.count, 0) / recentDays.length)
+            : (totalOrders || 4);
+          const avgDailyRevenue = recentDays.length > 0
+            ? (recentDays.reduce((sum, d) => sum + d.amount, 0) / recentDays.length)
+            : (totalRevenue || 2000);
+
+          const tomorrowDayIndex = (new Date().getDay() + 1) % 7;
+          const isTomorrowWeekend = tomorrowDayIndex === 0 || tomorrowDayIndex === 6;
+          const dayFactor = isTomorrowWeekend ? 1.25 : 1.05;
+
+          const predictedOrdersMin = Math.max(1, Math.round(avgDailyOrders * 0.9 * dayFactor));
+          const predictedOrdersMax = Math.max(predictedOrdersMin + 2, Math.round(avgDailyOrders * 1.35 * dayFactor));
+
+          const predictedRevMin = Math.round(avgDailyRevenue * 0.9 * dayFactor);
+          const predictedRevMax = Math.round(avgDailyRevenue * 1.35 * dayFactor);
+
+          const predictedTopServices = sortedServices.length > 0 
+            ? sortedServices.slice(0, 2).map(([name]) => name).join(' & ') 
+            : 'Dry Cleaning & Steam Ironing';
+
+          const recommendedRiders = Math.max(1, Math.ceil(predictedOrdersMax / 5));
+
+          return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+              <div className="bg-white text-slate-900 w-full max-w-4xl rounded-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-slate-200">
+                
+                {/* Modal Toolbar */}
+                <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xl">
+                      📊
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-white leading-tight">EOD Graphical Operations Report</h3>
+                      <p className="text-xs text-slate-400 font-medium">Visual Analytics &amp; Day Closing Summary</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={exportEODGraphPDF}
+                      disabled={isExportingEODPdf}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all uppercase tracking-wider cursor-pointer"
+                    >
+                      {isExportingEODPdf ? (
+                        <span>⏳ Generating PDF...</span>
+                      ) : (
+                        <><span>📥</span> Export PDF (with Graphs)</>
+                      )}
+                    </button>
+                    <button
+                      onClick={exportEODReport}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black px-4 py-2.5 rounded-xl flex items-center gap-2 border border-slate-700 transition-all uppercase tracking-wider cursor-pointer"
+                      title="Download 2-sheet raw Excel workbook"
+                    >
+                      <span>📊</span> Excel
+                    </button>
+                    <button
+                      onClick={() => setShowEODModal(false)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors ml-2 cursor-pointer font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {/* Printable Graphical Report Content */}
+                <div id="eod-printable-report" className="p-6 md:p-8 overflow-y-auto flex-1 bg-slate-50 space-y-6 custom-scrollbar">
+                  
+                  {/* Brand & Branch Banner */}
+                  <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-2xl text-blue-600 tracking-tight">Laundry Basket</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Official EOD Report</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Branch: <strong className="text-slate-800">{storeName}</strong> ({storeId}) · Unit of Everika</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Report Date</p>
+                      <p className="text-xl font-black text-slate-900">{todayDateStr}</p>
+                      <p className="text-[10px] font-semibold text-slate-500">Generated at {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
+                    </div>
+                  </div>
+
+                  {/* KPI Executive Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Sales Today</p>
+                      <p className="text-2xl font-black text-blue-600 mt-1">₹{totalRevenue.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-1">{totalOrders} orders booked</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Cash In Hand</p>
+                      <p className="text-2xl font-black text-emerald-600 mt-1">₹{cashRevenue.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-1">{cashPct}% of total revenue</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-blue-600 tracking-wider">Online / UPI QR</p>
+                      <p className="text-2xl font-black text-blue-600 mt-1">₹{onlineRevenue.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-1">{onlinePct}% of total revenue</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Pending Balance</p>
+                      <p className="text-2xl font-black text-amber-600 mt-1">₹{pendingRevenue.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] font-bold text-slate-500 mt-1">{pendingPct}% uncollected</p>
+                    </div>
+                  </div>
+
+                  {/* Graphs Row 1: Hourly Order Flow & Payment Settlement */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Graph 1: Hourly Order Activity (Bar Chart) */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="font-black text-sm text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📈</span> Hourly Order Activity Graph
+                          </h4>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700">Today</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mb-4">Volume of orders booked by time window</p>
+                      </div>
+
+                      <div className="h-44 flex items-end justify-between gap-2 pt-6 pb-2 px-2 border-b border-slate-100">
+                        {timeSlots.map((slot, i) => {
+                          const heightPct = maxSlotCount > 0 ? Math.max(15, Math.round((slot.count / maxSlotCount) * 100)) : 15;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                              <span className="text-[10px] font-black text-slate-700">{slot.count}</span>
+                              <div 
+                                style={{ height: `${heightPct}%` }}
+                                className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm transition-all flex items-center justify-center"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between pt-2 px-1 text-[9px] font-bold text-slate-500">
+                        {timeSlots.map((slot, i) => (
+                          <span key={i} className="text-center flex-1 truncate">{slot.label.split(' ')[0]}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Graph 2: Revenue Settlement Breakdown (Multi-Segment Visual) */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="font-black text-sm text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>💳</span> Revenue Settlement Graph
+                          </h4>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Cash vs Online: {cashCollectedPct}% / {onlineCollectedPct}%
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mb-4">Breakdown of collected revenue vs pending amount</p>
+                      </div>
+
+                      <div className="my-auto py-2">
+                        <div className="w-full h-8 bg-slate-100 rounded-xl overflow-hidden flex shadow-inner border border-slate-200">
+                          {cashPct > 0 && (
+                            <div 
+                              style={{ width: `${cashPct}%` }} 
+                              className="bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black truncate px-1 transition-all"
+                              title={`Cash: ₹${cashRevenue} (${cashPct}%)`}
+                            >
+                              Cash {cashPct}%
+                            </div>
+                          )}
+                          {onlinePct > 0 && (
+                            <div 
+                              style={{ width: `${onlinePct}%` }} 
+                              className="bg-blue-600 flex items-center justify-center text-white text-[10px] font-black truncate px-1 transition-all"
+                              title={`Online: ₹${onlineRevenue} (${onlinePct}%)`}
+                            >
+                              Online {onlinePct}%
+                            </div>
+                          )}
+                          {pendingPct > 0 && (
+                            <div 
+                              style={{ width: `${pendingPct}%` }} 
+                              className="bg-amber-400 flex items-center justify-center text-slate-900 text-[10px] font-black truncate px-1 transition-all"
+                              title={`Pending: ₹${pendingRevenue} (${pendingPct}%)`}
+                            >
+                              Pending {pendingPct}%
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/60">
+                            <span className="block text-[9px] font-black uppercase text-emerald-800">Cash In Hand</span>
+                            <span className="text-xs font-black text-emerald-700">₹{cashRevenue.toLocaleString('en-IN')}</span>
+                            <span className="block text-[8px] font-bold text-emerald-600/75 mt-0.5">{cashCollectedPct}% of collected</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200/60">
+                            <span className="block text-[9px] font-black uppercase text-blue-800">Online / UPI QR</span>
+                            <span className="text-xs font-black text-blue-700">₹{onlineRevenue.toLocaleString('en-IN')}</span>
+                            <span className="block text-[8px] font-bold text-blue-600/75 mt-0.5">{onlineCollectedPct}% of collected</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/60">
+                            <span className="block text-[9px] font-black uppercase text-amber-800">Pending Balance</span>
+                            <span className="text-xs font-black text-amber-700">₹{pendingRevenue.toLocaleString('en-IN')}</span>
+                            <span className="block text-[8px] font-bold text-amber-600/75 mt-0.5">{pendingPct}% uncollected</span>
+                          </div>
+                        </div>
+
+                        {/* Direct Cash vs Online Comparison Bar */}
+                        <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                          <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-600 mb-1.5">
+                            <span>Cash vs Online Collected Comparison</span>
+                            <span className="font-bold text-slate-800">{totalCollected > 0 ? `₹${totalCollected.toLocaleString('en-IN')} Total Collected` : 'No Collections'}</span>
+                          </div>
+                          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
+                            {cashCollectedPct > 0 && (
+                              <div style={{ width: `${cashCollectedPct}%` }} className="bg-emerald-500 h-full" title={`Cash: ${cashCollectedPct}%`} />
+                            )}
+                            {onlineCollectedPct > 0 && (
+                              <div style={{ width: `${onlineCollectedPct}%` }} className="bg-blue-600 h-full" title={`Online: ${onlineCollectedPct}%`} />
+                            )}
+                          </div>
+                          <div className="flex justify-between text-[10px] font-bold mt-1.5">
+                            <span className="text-emerald-700 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                              Cash ({cashCollectedPct}%)
+                            </span>
+                            <span className="text-blue-700 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                              Online UPI ({onlineCollectedPct}%)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Graphs Row 2: Status Pipeline & Top Services */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Graph 3: Order Status Pipeline */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                      <h4 className="font-black text-sm text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <span>📦</span> Order Status Pipeline Graph
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mb-4">Fulfillment status of today&apos;s workload</p>
+
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs font-bold mb-1">
+                            <span className="text-emerald-700">✅ Delivered to Customer</span>
+                            <span className="text-slate-700">{deliveredCount} ({totalOrders > 0 ? Math.round((deliveredCount / totalOrders) * 100) : 0}%)</span>
+                          </div>
+                          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              style={{ width: `${totalOrders > 0 ? (deliveredCount / totalOrders) * 100 : 0}%` }} 
+                              className="h-full bg-emerald-500 rounded-full"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs font-bold mb-1">
+                            <span className="text-blue-700">🧼 In Process (Washing / Ironing)</span>
+                            <span className="text-slate-700">{inProcessCount} ({totalOrders > 0 ? Math.round((inProcessCount / totalOrders) * 100) : 0}%)</span>
+                          </div>
+                          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              style={{ width: `${totalOrders > 0 ? (inProcessCount / totalOrders) * 100 : 0}%` }} 
+                              className="h-full bg-blue-600 rounded-full"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-xs font-bold mb-1">
+                            <span className="text-orange-700">🛵 Pickup / En Route</span>
+                            <span className="text-slate-700">{pendingCount} ({totalOrders > 0 ? Math.round((pendingCount / totalOrders) * 100) : 0}%)</span>
+                          </div>
+                          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              style={{ width: `${totalOrders > 0 ? (pendingCount / totalOrders) * 100 : 0}%` }} 
+                              className="h-full bg-orange-500 rounded-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Graph 4: Top Service Demand */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                      <h4 className="font-black text-sm text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <span>🧺</span> Top Service Demand Graph
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mb-4">Most demanded services today</p>
+
+                      <div className="space-y-3">
+                        {sortedServices.length === 0 ? (
+                          <p className="text-xs text-slate-400 font-bold py-6 text-center">No orders recorded today yet</p>
+                        ) : (
+                          sortedServices.map(([sName, count], idx) => {
+                            const pct = Math.round((count / maxServiceCount) * 100);
+                            return (
+                              <div key={idx}>
+                                <div className="flex justify-between text-xs font-bold mb-1">
+                                  <span className="text-slate-800 truncate max-w-[200px]">{sName}</span>
+                                  <span className="text-blue-600 font-black">{count} orders</span>
+                                </div>
+                                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    style={{ width: `${pct}%` }} 
+                                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Graphs Row 3: Repeat Customer Rate & Next-Day Prediction */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Card A: Repeat Customer Retention Rate */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="font-black text-sm text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🔁</span> Repeat Customer Rate (Repeat CX)
+                          </h4>
+                          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${repeatRatePct >= 50 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-blue-100 text-blue-800 border border-blue-300'}`}>
+                            {repeatRatePct}% Repeat Ratio
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mb-3">Returning vs first-time customer volume &amp; revenue</p>
+                      </div>
+
+                      {/* Visual Repeat vs New Split Bar */}
+                      <div className="space-y-3">
+                        <div className="w-full h-5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner border border-slate-200">
+                          {repeatRatePct > 0 && (
+                            <div 
+                              style={{ width: `${repeatRatePct}%` }}
+                              className="bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center transition-all truncate px-1"
+                              title={`Repeat Customers: ${repeatRatePct}%`}
+                            >
+                              Repeat {repeatRatePct}%
+                            </div>
+                          )}
+                          {newRatePct > 0 && (
+                            <div 
+                              style={{ width: `${newRatePct}%` }}
+                              className="bg-blue-500 text-white text-[10px] font-black flex items-center justify-center transition-all truncate px-1"
+                              title={`New Customers: ${newRatePct}%`}
+                            >
+                              New {newRatePct}%
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Breakdown Metrics */}
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                          <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/60">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                                <span>⭐</span> Repeat Orders
+                              </span>
+                              <span className="text-xs font-black text-emerald-700">{repeatCxOrdersCount} ({repeatRatePct}%)</span>
+                            </div>
+                            <p className="text-sm font-black text-emerald-900 mt-1">₹{repeatCxRevenue.toLocaleString('en-IN')}</p>
+                            <p className="text-[9px] font-semibold text-emerald-600/80 mt-0.5">High loyalty customer base</p>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/60">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-1">
+                                <span>🌱</span> New Customers
+                              </span>
+                              <span className="text-xs font-black text-blue-700">{newCxOrdersCount} ({newRatePct}%)</span>
+                            </div>
+                            <p className="text-sm font-black text-blue-900 mt-1">₹{newCxRevenue.toLocaleString('en-IN')}</p>
+                            <p className="text-[9px] font-semibold text-blue-600/80 mt-0.5">First-time orders booked</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card B: Tomorrow's Operational & Demand Prediction */}
+                    <div className="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/60 p-5 rounded-2xl border border-indigo-200/70 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="font-black text-sm text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🤖</span> Next-Day Demand &amp; Sales Forecast
+                          </h4>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-600 text-white shadow-sm">
+                            AI Trend Engine
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mb-3">Projected workload &amp; staffing advisory for tomorrow</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="p-2.5 rounded-xl bg-white border border-indigo-100 shadow-xs">
+                            <span className="text-[9px] font-black uppercase text-indigo-600 block">Predicted Orders</span>
+                            <span className="text-sm font-black text-slate-800 mt-0.5 block">{predictedOrdersMin} - {predictedOrdersMax} Orders</span>
+                            <span className="text-[9px] font-bold text-slate-400">7-day velocity model</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-white border border-indigo-100 shadow-xs">
+                            <span className="text-[9px] font-black uppercase text-indigo-600 block">Projected Revenue</span>
+                            <span className="text-sm font-black text-slate-800 mt-0.5 block">₹{predictedRevMin.toLocaleString('en-IN')} - ₹{predictedRevMax.toLocaleString('en-IN')}</span>
+                            <span className="text-[9px] font-bold text-slate-400">{isTomorrowWeekend ? 'Weekend rush factored' : 'Weekday baseline'}</span>
+                          </div>
+                        </div>
+
+                        {/* Operational Recommendations */}
+                        <div className="bg-white/90 border border-indigo-100 rounded-xl p-2.5 space-y-1.5 text-[10px]">
+                          <div className="flex items-center justify-between text-slate-700">
+                            <span className="font-bold flex items-center gap-1 text-slate-600">
+                              <span>⏰</span> Peak Pickup Hours:
+                            </span>
+                            <span className="font-black text-indigo-950">08:00 - 11:00 AM &amp; 05:00 - 08:00 PM</span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-700">
+                            <span className="font-bold flex items-center gap-1 text-slate-600">
+                              <span>🛵</span> Staffing Advisory:
+                            </span>
+                            <span className="font-black text-emerald-700">{recommendedRiders} Active Riders Recommended</span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-700">
+                            <span className="font-bold flex items-center gap-1 text-slate-600">
+                              <span>🧺</span> High Demand Service:
+                            </span>
+                            <span className="font-black text-blue-700 truncate max-w-[170px]">{predictedTopServices}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Footer Verification */}
+                  <div className="border-t border-slate-200 pt-4 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
+                    <p>Manager Signature: _______________________</p>
+                    <p className="mt-2 md:mt-0 font-medium">Laundry Basket Operations · EOD Closing Audit</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>
@@ -3951,6 +5201,41 @@ function OrderCard({ order, riders, onAssign, onUpdate, onView, onPrint, onPdf, 
               <span className="text-xs font-black text-primary font-mono">{order.deliveryCode}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Proof of Service Photos Badges */}
+      {(order.pickupPhoto || order.deliveryPhoto) && (
+        <div className="mb-2.5 bg-primary/5 border border-primary/10 rounded-xl p-1.5 flex items-center justify-between gap-1.5">
+          <span className="text-[7.5px] font-black uppercase text-text-secondary">📸 Photos:</span>
+          <div className="flex gap-1.5">
+            {order.pickupPhoto && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const w = window.open("");
+                  w?.document.write(`<title>Pickup Photo #${order.id}</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${order.pickupPhoto}" style="max-width:100%;max-height:100%;object-fit:contain;"/></body>`);
+                }}
+                className="text-[8px] font-black px-2 py-1 rounded bg-white text-primary border border-primary/20 hover:bg-primary hover:text-white uppercase transition-all shadow-sm"
+              >
+                📦 Pickup
+              </button>
+            )}
+            {order.deliveryPhoto && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const w = window.open("");
+                  w?.document.write(`<title>Delivery Photo #${order.id}</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${order.deliveryPhoto}" style="max-width:100%;max-height:100%;object-fit:contain;"/></body>`);
+                }}
+                className="text-[8px] font-black px-2 py-1 rounded bg-white text-green-700 border border-green-300 hover:bg-green-600 hover:text-white uppercase transition-all shadow-sm"
+              >
+                ✅ Delivery
+              </button>
+            )}
+          </div>
         </div>
       )}
 
