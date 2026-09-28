@@ -1274,6 +1274,16 @@ app.get('/api/orders/store/:storeId', verifyToken, async (req, res) => {
             ]);
             const populatedOrders = await populateRidersDetails(orders);
             const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
+            finalOrders.forEach(o => {
+                const isRcv = String(o.paymentStatus || o.payment_status || '').toLowerCase().includes('received');
+                const tot = Number(o.total || 0);
+                if (o.pending_amount === undefined || o.pending_amount === null) {
+                    o.pending_amount = isRcv ? 0 : tot;
+                }
+                if (o.received_amount === undefined || o.received_amount === null) {
+                    o.received_amount = isRcv ? tot : 0;
+                }
+            });
             return res.json({
                 orders: finalOrders,
                 summary: summary[0] || {
@@ -1289,6 +1299,16 @@ app.get('/api/orders/store/:storeId', verifyToken, async (req, res) => {
         const orders = await Order.find(filter).sort({ _id: -1 }).select('-events -__v').lean();
         const populatedOrders = await populateRidersDetails(orders);
         const finalOrders = await attachRepeatCustomerFlag(populatedOrders);
+        finalOrders.forEach(o => {
+            const isRcv = String(o.paymentStatus || o.payment_status || '').toLowerCase().includes('received');
+            const tot = Number(o.total || 0);
+            if (o.pending_amount === undefined || o.pending_amount === null) {
+                o.pending_amount = isRcv ? 0 : tot;
+            }
+            if (o.received_amount === undefined || o.received_amount === null) {
+                o.received_amount = isRcv ? tot : 0;
+            }
+        });
         res.json(finalOrders);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1947,6 +1967,12 @@ app.post('/api/orders', async (req, res) => {
             }
         }
 
+        const rawPayStatus = req.body.paymentStatus || req.body.payment_status || 'Pending';
+        const isPaymentReceived = String(rawPayStatus).toLowerCase().includes('received');
+        const resolvedPayStatus = isPaymentReceived ? 'Received' : 'Pending';
+        const pendingAmount = req.body.pending_amount !== undefined ? Number(req.body.pending_amount) : (isPaymentReceived ? 0 : finalTotal);
+        const receivedAmount = req.body.received_amount !== undefined ? Number(req.body.received_amount) : (isPaymentReceived ? finalTotal : 0);
+
         const orderData = {
             ...req.body,
             storeId: finalStoreId,
@@ -1957,6 +1983,12 @@ app.post('/api/orders', async (req, res) => {
             deliveryFee: deliveryFee,
             total: finalTotal,
             status: orderStatus,
+            paymentStatus: resolvedPayStatus,
+            payment_status: resolvedPayStatus,
+            paymentMode: req.body.paymentMode || req.body.payment_mode || (isPaymentReceived ? 'Cash' : null),
+            payment_mode: req.body.paymentMode || req.body.payment_mode || (isPaymentReceived ? 'Cash' : null),
+            pending_amount: pendingAmount,
+            received_amount: receivedAmount,
             pickupCode: isWalkInOrWhatsapp ? null : (req.body.pickupCode || generatedPickupCode),
             deliveryCode: isWalkInOrWhatsapp ? null : (req.body.deliveryCode || generatedDeliveryCode),
             sourceSegment: finalSourceSegment,
@@ -2137,6 +2169,20 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         const isTransfer = newStoreId && newStoreId !== oldStoreId;
 
         const updateData = { ...req.body };
+        if (req.body.paymentStatus || req.body.payment_status) {
+            const rawStatus = req.body.paymentStatus || req.body.payment_status;
+            const isRcv = String(rawStatus).toLowerCase().includes('received');
+            const resolvedStatus = isRcv ? 'Received' : 'Pending';
+            updateData.paymentStatus = resolvedStatus;
+            updateData.payment_status = resolvedStatus;
+            const orderTotal = Number(req.body.total !== undefined ? req.body.total : order.total) || 0;
+            if (updateData.pending_amount === undefined) {
+                updateData.pending_amount = isRcv ? 0 : orderTotal;
+            }
+            if (updateData.received_amount === undefined) {
+                updateData.received_amount = isRcv ? orderTotal : 0;
+            }
+        }
         const eventsToPush = [];
         if (req.body.status) {
             eventsToPush.push({ status: req.body.status });

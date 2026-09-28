@@ -2,3 +2,6 @@
 node_modules
 hrms/.next
 hrms/node_modules
+*serviceAccountKey.json
+.env
+

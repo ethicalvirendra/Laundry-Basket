@@ -803,22 +803,37 @@ export default function ManagerPanel() {
       });
       if (res.status === 401) { localStorage.clear(); window.location.href = '/manager/login'; return; }
       const data = await res.json();
+      const calculateSummary = (orderList: any[], rawSummary?: any) => {
+        let pending = 0;
+        let received = 0;
+        let highRisk = 0;
+        orderList.forEach((o: any) => {
+          const isRcv = String(o.paymentStatus || o.payment_status || '').toLowerCase().includes('received');
+          const tot = Number(o.total || o.amount || 0);
+          const p = (o.pending_amount !== undefined && o.pending_amount !== null && !isNaN(Number(o.pending_amount)))
+            ? Number(o.pending_amount)
+            : (isRcv ? 0 : tot);
+          const r = (o.received_amount !== undefined && o.received_amount !== null && !isNaN(Number(o.received_amount)))
+            ? Number(o.received_amount)
+            : (isRcv ? tot : 0);
+          pending += p;
+          received += r;
+          if (o.payment_risk === 'HIGH RISK' || (!isRcv && tot > 0)) highRisk++;
+        });
+        return {
+          totalOrders: Number(rawSummary?.totalOrders || orderList.length),
+          pendingPayments: pending,
+          receivedAmount: received,
+          highRiskOrders: Number(rawSummary?.highRiskOrders ?? highRisk)
+        };
+      };
+
       if (Array.isArray(data)) {
         setOrders(data);
-        setOrderSummary({
-          totalOrders: data.length,
-          pendingPayments: data.reduce((s: number, o: any) => s + (Number(o.pending_amount) || 0), 0),
-          receivedAmount: data.reduce((s: number, o: any) => s + (Number(o.received_amount) || 0), 0),
-          highRiskOrders: data.filter((o: any) => o.payment_risk === 'HIGH RISK').length
-        });
+        setOrderSummary(calculateSummary(data));
       } else if (Array.isArray(data.orders)) {
         setOrders(data.orders);
-        setOrderSummary({
-          totalOrders: Number(data.summary?.totalOrders || data.orders.length),
-          pendingPayments: Number(data.summary?.pendingPayments || 0),
-          receivedAmount: Number(data.summary?.receivedAmount || 0),
-          highRiskOrders: Number(data.summary?.highRiskOrders || 0)
-        });
+        setOrderSummary(calculateSummary(data.orders, data.summary));
       }
     } catch (err) {
       logError("Fetch Orders Failed", err);
@@ -1333,6 +1348,7 @@ export default function ManagerPanel() {
         return serviceStr;
       });
 
+      const isRcv = String(editOrderForm.paymentStatus).toLowerCase().includes('received');
       const updatedOrder = {
         name: editOrderForm.name,
         phone: editOrderForm.phone,
@@ -1344,7 +1360,10 @@ export default function ManagerPanel() {
         totalMode: editOrderForm.totalMode,
         adjustment: editOrderForm.adjustment,
         status: editOrderForm.status,
-        paymentStatus: editOrderForm.paymentStatus,
+        paymentStatus: isRcv ? 'Received' : 'Pending',
+        payment_status: isRcv ? 'Received' : 'Pending',
+        pending_amount: isRcv ? 0 : finalTotal,
+        received_amount: isRcv ? finalTotal : 0,
         assignedRiderId: editOrderForm.assignedRiderId || null,
         source: editOrderForm.source,
         sourceSegment: editOrderForm.sourceSegment || 'RF',
@@ -1407,6 +1426,10 @@ export default function ManagerPanel() {
         discount: walkinForm.discount,
         address: walkinForm.address || (walkinForm.source === 'WhatsApp' ? walkinForm.address : 'Store Walk-in'),
         status: walkinForm.source === 'Walk-in' ? 'Processing' : 'Pending',
+        paymentStatus: 'Pending',
+        payment_status: 'Pending',
+        pending_amount: finalTotal,
+        received_amount: 0,
         timestamp: walkinForm.timestamp || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
         source: walkinForm.source,
         sourceSegment: walkinForm.sourceSegment || (walkinForm.source === 'WhatsApp' ? 'SM' : 'RF'),
@@ -2449,7 +2472,7 @@ export default function ManagerPanel() {
                     <tr className="text-[8px] font-black uppercase tracking-widest">
                       <th colSpan={4} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
                       <th colSpan={5} className="px-4 pt-4 pb-2 bg-violet-500/10 text-violet-700 border-r-2 border-white/60 text-center">📦 Order &amp; Item Details</th>
-                                            <th colSpan={2} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">Payment</th>
+                      <th colSpan={3} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Payment &amp; Amount</th>
                       <th colSpan={1} className="px-4 pt-4 pb-2 bg-red-500/10 text-red-700 text-center">⚡ Actions</th>
                     </tr>
                     <tr className="border-b-2 border-black/5 text-[9px] font-black uppercase tracking-widest text-text-secondary">
@@ -2462,7 +2485,8 @@ export default function ManagerPanel() {
                       <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Qty</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Service Type</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5 border-r border-black/8">Status</th>
-                                            <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Payment Status</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Total Amount</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Payment Status</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5 border-r border-black/8">Mode</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-red-500/5">Action</th>
                     </tr>
@@ -2480,6 +2504,7 @@ export default function ManagerPanel() {
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-32"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-8"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
+                            <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-24"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
@@ -2508,7 +2533,7 @@ export default function ManagerPanel() {
                         );
                       });
                       if (filtered.length === 0) return (
-                        <tr><td colSpan={12} className="px-4 py-16 text-center text-text-secondary font-black uppercase tracking-widest text-xs">No orders found matching your search</td></tr>
+                        <tr><td colSpan={13} className="px-4 py-16 text-center text-text-secondary font-black uppercase tracking-widest text-xs">No orders found matching your search</td></tr>
                       );
 
                       const totalRows = filtered.length;
@@ -2524,8 +2549,35 @@ export default function ManagerPanel() {
                         const mobile    = o.mobile_number || o.phone || '-';
                         const orderDate = o.order_date || (o.timestamp ? o.timestamp.split(',')[0] : '-');
                         const items     = o.items_ordered || (Array.isArray(o.services) ? o.services.join(', ') : o.services) || '-';
-                        const qty       = o.quantity ?? '-';
-                        const service   = o.service_type || (Array.isArray(o.services) ? o.services[0] : o.services) || '-';
+                        
+                        // Parse quantity properly from services if quantity is not set
+                        const qty = (() => {
+                          if (o.quantity !== undefined && o.quantity !== null && o.quantity !== '' && o.quantity !== '-') return o.quantity;
+                          if (Array.isArray(o.services)) {
+                            let totalQ = 0;
+                            for (const s of o.services) {
+                              const match = String(s).match(/x\s*(\d+)/i);
+                              if (match) totalQ += parseInt(match[1], 10);
+                              else totalQ += 1;
+                            }
+                            return totalQ > 0 ? totalQ : '-';
+                          }
+                          return '-';
+                        })();
+
+                        // Format service type cleanly
+                        const service = o.service_type || (() => {
+                          if (!o.services) return '-';
+                          const str = Array.isArray(o.services) ? o.services.join(', ') : String(o.services);
+                          const types: string[] = [];
+                          if (/dry\s*clean/i.test(str)) types.push('Dry Clean');
+                          if (/wash\s*&\s*iron|wash\+iron/i.test(str)) types.push('Wash & Iron');
+                          else if (/wash\s*only/i.test(str)) types.push('Wash Only');
+                          else if (/wash/i.test(str) && !types.includes('Wash & Iron')) types.push('Wash');
+                          if (/iron/i.test(str) && !types.includes('Wash & Iron')) types.push('Ironing');
+                          return types.length > 0 ? types.join(', ') : (Array.isArray(o.services) ? o.services[0] : str);
+                        })();
+
                         const cxType    = o.cx_type || (o.source === 'Business' ? 'Business' : 'Residential');
                         const cxTypeColors: Record<string, string> = {
                           'Residential': 'bg-green-500/15 text-green-700',
@@ -2543,11 +2595,20 @@ export default function ManagerPanel() {
                           'Pickup done':     'bg-purple-500/15 text-purple-700 border border-purple-500/20',
                         };
                         const statusBadgeClass = statusColors[status] || 'bg-black/5 text-text-secondary';
-                        const rawPaymentStatus = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : 'Received');
-                        const paymentStatus = String(rawPaymentStatus).toLowerCase().includes('pending') ? 'Pending' : 'Received';
+                        
+                        const orderTotal = Number(o.total || o.amount || 0);
+                        const rawPaymentStatus = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                        const paymentStatus = String(rawPaymentStatus).toLowerCase().includes('received') ? 'Received' : 'Pending';
                         const paymentMode = o.paymentMode || o.payment_mode || (paymentStatus === 'Received' ? 'Cash' : 'Not Set');
-                        const pendingAmount = Number(o.pending_amount || 0);
-                        const receivedAmount = Number(o.received_amount || 0);
+
+                        const hasExplicitAmounts = (o.pending_amount !== undefined && o.pending_amount !== null && !isNaN(Number(o.pending_amount))) || (o.received_amount !== undefined && o.received_amount !== null && !isNaN(Number(o.received_amount)));
+                        const pendingAmount = hasExplicitAmounts 
+                          ? Number(o.pending_amount || 0) 
+                          : (paymentStatus === 'Received' ? 0 : orderTotal);
+                        const receivedAmount = hasExplicitAmounts 
+                          ? Number(o.received_amount || 0) 
+                          : (paymentStatus === 'Received' ? orderTotal : 0);
+
                         const paymentAmount = (option: 'Pending' | 'Received') => (
                           option === 'Pending' ? pendingAmount : receivedAmount
                         ).toLocaleString('en-IN');
@@ -2583,6 +2644,9 @@ export default function ManagerPanel() {
                             <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-violet-500/[0.02]">{service}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-violet-500/[0.02] border-r border-black/5">
                               <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${statusBadgeClass}`}>{status === 'Delivered to Cx' ? 'Delivered' : status}</span>
+                            </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
+                              <span className="text-xs font-black text-emerald-800 tracking-tight">₹{orderTotal.toLocaleString('en-IN')}</span>
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
                               <div className="inline-flex rounded-xl border border-black/5 bg-white/60 p-1">
