@@ -1989,6 +1989,8 @@ app.post('/api/orders', async (req, res) => {
             payment_mode: req.body.paymentMode || req.body.payment_mode || (isPaymentReceived ? 'Cash' : null),
             pending_amount: pendingAmount,
             received_amount: receivedAmount,
+            received_date: isPaymentReceived ? (req.body.received_date || new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })) : null,
+            received_month: isPaymentReceived ? (req.body.received_month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })) : null,
             pickupCode: isWalkInOrWhatsapp ? null : (req.body.pickupCode || generatedPickupCode),
             deliveryCode: isWalkInOrWhatsapp ? null : (req.body.deliveryCode || generatedDeliveryCode),
             sourceSegment: finalSourceSegment,
@@ -2181,6 +2183,17 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
             }
             if (updateData.received_amount === undefined) {
                 updateData.received_amount = isRcv ? orderTotal : 0;
+            }
+            if (isRcv) {
+                if (!updateData.received_date) {
+                    updateData.received_date = req.body.received_date || new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+                }
+                if (!updateData.received_month) {
+                    updateData.received_month = req.body.received_month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+                }
+            } else {
+                updateData.received_date = null;
+                updateData.received_month = null;
             }
         }
         const eventsToPush = [];

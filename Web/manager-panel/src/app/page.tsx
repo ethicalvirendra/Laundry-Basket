@@ -866,6 +866,8 @@ export default function ManagerPanel() {
       const nextMode = paymentMode || order.paymentMode || order.payment_mode || 'Cash';
       const receivedAmount = paymentStatus === 'Received' ? total : 0;
       const pendingAmount = paymentStatus === 'Received' ? 0 : total;
+      const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const todayMonthStr = new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
       const payload = {
         paymentStatus,
@@ -874,6 +876,8 @@ export default function ManagerPanel() {
         payment_mode: nextMode,
         received_amount: receivedAmount,
         pending_amount: pendingAmount,
+        received_date: paymentStatus === 'Received' ? todayDateStr : null,
+        received_month: paymentStatus === 'Received' ? todayMonthStr : null,
         payment_risk: paymentStatus === 'Received' ? 'CLEAR' : 'HIGH RISK'
       };
 
@@ -1152,10 +1156,11 @@ export default function ManagerPanel() {
       const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
       const todayIsoStr = new Date().toISOString().split('T')[0];
 
-      // Filter today's orders by timestamp or order_date
+      // Filter today's orders by timestamp, order_date, or received_date
       const todayOrders = orders.filter(o => {
         const ts = String(o.timestamp || o.order_date || '');
-        return ts.includes(todayDateStr) || ts.includes(todayIsoStr);
+        const rcDate = String(o.received_date || '');
+        return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
       });
 
       // Compute EOD stats
@@ -1163,16 +1168,16 @@ export default function ManagerPanel() {
       const totalRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
       const receivedRevenue = todayOrders
         .filter(o => o.paymentStatus === 'Received' || o.payment_status === 'Received')
-        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-      const pendingRevenue = totalRevenue - receivedRevenue;
+        .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
+      const pendingRevenue = Math.max(0, totalRevenue - receivedRevenue);
 
       const cashRevenue = todayOrders
         .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Cash' || o.payment_mode === 'Cash'))
-        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+        .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
 
       const onlineRevenue = todayOrders
-        .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Online QR' || o.paymentMode === 'Online' || o.payment_mode === 'Online'))
-        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+        .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && ((o.paymentMode && o.paymentMode !== 'Cash') || (o.payment_mode && o.payment_mode !== 'Cash')))
+        .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
 
       const deliveredCount = todayOrders.filter(o => ['delivered', 'delivered to cx', 'completed'].includes(String(o.status).toLowerCase())).length;
       const inProcessCount = todayOrders.filter(o => ['processing', 'washing', 'drying', 'ironing'].includes(String(o.status).toLowerCase())).length;
@@ -2830,95 +2835,202 @@ export default function ManagerPanel() {
             </div>
           )}
 
-          {activeTab === 'today' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h3 className="text-4xl font-black tracking-tight">Today's Orders</h3>
-                  <p className="text-text-secondary text-sm mt-1">Orders received today ({new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })})</p>
+          {activeTab === 'today' && (() => {
+            const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+            const todayIsoStr = new Date().toISOString().split('T')[0];
+
+            // Orders placed today OR orders where payment was received today
+            const todayOrdersList = orders.filter((o: any) => {
+              const ts = String(o.timestamp || o.order_date || '');
+              const rcDate = String(o.received_date || '');
+              return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
+            });
+
+            const totalOrdersCount = todayOrdersList.length;
+            const totalRevenueToday = todayOrdersList.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
+
+            const receivedOrdersToday = todayOrdersList.filter((o: any) => o.paymentStatus === 'Received' || o.payment_status === 'Received');
+            const totalReceivedToday = receivedOrdersToday.reduce((sum: number, o: any) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
+
+            const cashReceivedToday = receivedOrdersToday
+              .filter((o: any) => o.paymentMode === 'Cash' || o.payment_mode === 'Cash')
+              .reduce((sum: number, o: any) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
+
+            const onlineReceivedToday = receivedOrdersToday
+              .filter((o: any) => (o.paymentMode && o.paymentMode !== 'Cash') || (o.payment_mode && o.payment_mode !== 'Cash'))
+              .reduce((sum: number, o: any) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
+
+            const pendingRevenueToday = Math.max(0, totalRevenueToday - totalReceivedToday);
+            const pendingOrdersCount = todayOrdersList.filter((o: any) => o.paymentStatus !== 'Received' && o.payment_status !== 'Received').length;
+
+            return (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                  <div>
+                    <h3 className="text-4xl font-black tracking-tight">Today's Orders</h3>
+                    <p className="text-text-secondary text-sm mt-1">Orders & payments for today ({todayDateStr})</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      className="btn-primary bg-emerald-600 hover:bg-emerald-700 px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                      onClick={() => setShowEODModal(true)}
+                      title="View & Export Complete End of Day Graphic Report"
+                    >
+                      <span className="text-base">📊</span> Export EOD Report
+                    </button>
+                    <button
+                      className="btn-primary bg-green-600 hover:bg-green-700 px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                      onClick={exportTodayExcel}
+                    >
+                      <span className="text-base">📥</span> Export Excel
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    className="btn-primary bg-emerald-600 hover:bg-emerald-700 px-6 py-4 rounded-3xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all"
-                    onClick={() => setShowEODModal(true)}
-                    title="View & Export Complete End of Day Graphic Report"
-                  >
-                    <span className="text-lg">📊</span> Export EOD Report
-                  </button>
-                  <button
-                    className="btn-primary bg-green-500 hover:bg-green-600 px-6 py-4 rounded-3xl flex items-center gap-2 shadow-lg text-white transition-all"
-                    onClick={exportTodayExcel}
-                  >
-                    <span className="text-xl">📊</span> Export Excel
-                  </button>
-                  <div className="glass px-8 py-4 rounded-3xl border-2 border-primary/20 bg-primary/5">
-                    <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-1">Today's Revenue</p>
-                    <p className="text-3xl font-black text-text-primary">₹{orders.filter(o => o.timestamp && o.timestamp.includes(new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))).reduce((sum, o) => sum + (Number(o.total) || 0), 0)}</p>
+
+                {/* 3 KPI Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                  {/* Card 1: Today's Orders / Total Booked */}
+                  <div className="glass p-6 rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-black uppercase text-primary tracking-widest">Today's Total Booked</p>
+                      <span className="text-xl">📦</span>
+                    </div>
+                    <p className="text-3xl font-black text-text-primary">₹{totalRevenueToday}</p>
+                    <p className="text-xs text-text-secondary font-medium mt-1">{totalOrdersCount} orders placed today</p>
+                  </div>
+
+                  {/* Card 2: Today's Received Amount */}
+                  <div className="glass p-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-black uppercase text-emerald-700 tracking-widest">Today's Received Amount</p>
+                      <span className="text-xl">💰</span>
+                    </div>
+                    <p className="text-3xl font-black text-emerald-800">₹{totalReceivedToday}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-800 border border-emerald-600/20">
+                        Cash: ₹{cashReceivedToday}
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-600/15 text-blue-800 border border-blue-600/20">
+                        Online QR: ₹{onlineReceivedToday}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Today's Pending Collection */}
+                  <div className="glass p-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-black uppercase text-amber-700 tracking-widest">Today's Pending Collection</p>
+                      <span className="text-xl">⏳</span>
+                    </div>
+                    <p className="text-3xl font-black text-amber-800">₹{pendingRevenueToday}</p>
+                    <p className="text-xs text-amber-700/80 font-medium mt-1">{pendingOrdersCount} orders pending payment</p>
+                  </div>
+                </div>
+
+                {/* Table with interactive payment toggles */}
+                <div className="glass overflow-hidden rounded-3xl border border-black/5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-black/5 bg-white/50">
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Order ID</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Customer</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Service</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Status</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Amount</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Status</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Mode</th>
+                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loading ? (
+                          Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={`skeleton-${i}`} className="border-b border-black/5 animate-pulse">
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-20"></div></td>
+                              <td className="p-4">
+                                <div className="h-4 bg-black/10 rounded w-32 mb-2"></div>
+                                <div className="h-3 bg-black/5 rounded w-24"></div>
+                              </td>
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-24"></div></td>
+                              <td className="p-4"><div className="h-6 bg-black/10 rounded-full w-20"></div></td>
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-16"></div></td>
+                              <td className="p-4"><div className="h-6 bg-black/10 rounded-full w-24"></div></td>
+                              <td className="p-4"><div className="h-6 bg-black/10 rounded w-20"></div></td>
+                              <td className="p-4 text-right"><div className="h-4 bg-black/10 rounded w-16 ml-auto"></div></td>
+                            </tr>
+                          ))
+                        ) : todayOrdersList.map((o: any) => {
+                          const paymentStatus = (o.paymentStatus === 'Received' || o.payment_status === 'Received') ? 'Received' : 'Pending';
+                          const paymentMode = o.paymentMode || o.payment_mode || 'Cash';
+                          return (
+                            <tr key={o.id} className="border-b border-black/5 hover:bg-white/40 transition-colors">
+                              <td className="p-4 font-black text-sm text-primary">{o.id}</td>
+                              <td className="p-4">
+                                <div className="font-bold text-sm text-text-primary">{o.name}</div>
+                                <div className="text-[10px] text-text-secondary">{o.phone}</div>
+                              </td>
+                              <td className="p-4 text-sm text-text-secondary">{o.services?.[0] || 'Wash & Iron'}</td>
+                              <td className="p-4">
+                                <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-black/5">{o.status}</span>
+                              </td>
+                              <td className="p-4 font-black text-sm text-text-primary">₹{o.total}</td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl w-fit">
+                                  {(['Pending', 'Received'] as const).map(option => (
+                                    <button
+                                      key={option}
+                                      onClick={() => updatePayment(o, option, paymentMode)}
+                                      className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                        paymentStatus === option
+                                          ? option === 'Received'
+                                            ? 'bg-emerald-500 text-white shadow-sm font-bold'
+                                            : 'bg-amber-500 text-white shadow-sm font-bold'
+                                          : 'text-text-secondary hover:bg-white/60'
+                                      }`}
+                                    >
+                                      <span>{option}</span>
+                                      <span className={`ml-1 rounded-md px-1.5 py-0.5 text-[8px] ${paymentStatus === option ? 'bg-black/20 text-white' : 'bg-black/5 text-text-secondary'}`}>
+                                        ₹{option === 'Received' ? (paymentStatus === 'Received' ? (o.received_amount !== undefined ? o.received_amount : o.total) : o.total) : (paymentStatus === 'Received' ? 0 : o.total)}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <select
+                                  value={paymentMode}
+                                  onChange={(e) => updatePayment(o, paymentStatus, e.target.value)}
+                                  className="bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 text-[10px] font-black uppercase text-emerald-700 outline-none focus:border-emerald-500 shadow-sm cursor-pointer"
+                                >
+                                  {['Cash', 'Online QR', 'UPI', 'Card', 'Bank Transfer'].map(mode => (
+                                    <option key={mode} value={mode}>{mode}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-4 text-right">
+                                <button
+                                  onClick={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
+                                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
+                                >
+                                  View Details
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {!loading && todayOrdersList.length === 0 && (
+                          <tr>
+                            <td colSpan={8} className="p-8 text-center text-text-secondary text-sm font-medium">No orders recorded for today yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
-
-              <div className="glass overflow-hidden rounded-3xl border border-black/5">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-black/5 bg-white/40">
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Order ID</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Customer</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Service</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Status</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Amount</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-text-secondary tracking-widest">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={`skeleton-${i}`} className="border-b border-black/5 animate-pulse">
-                          <td className="p-6"><div className="h-4 bg-black/10 rounded w-20"></div></td>
-                          <td className="p-6">
-                            <div className="h-4 bg-black/10 rounded w-32 mb-2"></div>
-                            <div className="h-3 bg-black/5 rounded w-24"></div>
-                          </td>
-                          <td className="p-6"><div className="h-4 bg-black/10 rounded w-24"></div></td>
-                          <td className="p-6"><div className="h-6 bg-black/10 rounded-full w-20"></div></td>
-                          <td className="p-6"><div className="h-4 bg-black/10 rounded w-16"></div></td>
-                          <td className="p-6"><div className="h-4 bg-black/10 rounded w-20"></div></td>
-                        </tr>
-                      ))
-                    ) : orders
-                      .filter((o: any) => o.timestamp && o.timestamp.includes(new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })))
-                      .map((o: any) => (
-                        <tr key={o.id} className="border-b border-black/5 hover:bg-white/40 transition-colors">
-                          <td className="p-6 font-black text-sm text-primary">{o.id}</td>
-                          <td className="p-6">
-                            <div className="font-bold text-sm text-text-primary">{o.name}</div>
-                            <div className="text-[10px] text-text-secondary">{o.phone}</div>
-                          </td>
-                          <td className="p-6 text-sm text-text-secondary">{o.services?.[0] || 'Wash & Iron'}</td>
-                          <td className="p-6">
-                            <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-black/5">{o.status}</span>
-                          </td>
-                          <td className="p-6 font-black text-sm text-text-primary">₹{o.total}</td>
-                          <td className="p-6">
-                            <button
-                              onClick={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
-                              className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    {!loading && orders.filter(o => o.timestamp && o.timestamp.includes(new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))).length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-text-secondary text-sm font-medium">No orders received today yet.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           {activeTab === 'rates' && (
             <div className="animate-in fade-in zoom-in-95 duration-500">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
@@ -4677,26 +4789,27 @@ export default function ManagerPanel() {
           const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
           const todayIsoStr = new Date().toISOString().split('T')[0];
 
-          // Filter today's orders
+          // Filter today's orders by timestamp, order_date, or received_date
           const todayOrders = orders.filter(o => {
             const ts = String(o.timestamp || o.order_date || '');
-            return ts.includes(todayDateStr) || ts.includes(todayIsoStr);
+            const rcDate = String(o.received_date || '');
+            return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
           });
 
           const totalOrders = todayOrders.length;
           const totalRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
           const receivedRevenue = todayOrders
             .filter(o => o.paymentStatus === 'Received' || o.payment_status === 'Received')
-            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
           const pendingRevenue = Math.max(0, totalRevenue - receivedRevenue);
 
           const cashRevenue = todayOrders
             .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Cash' || o.payment_mode === 'Cash'))
-            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
 
           const onlineRevenue = todayOrders
-            .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && (o.paymentMode === 'Online QR' || o.paymentMode === 'Online' || o.payment_mode === 'Online'))
-            .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            .filter(o => (o.paymentStatus === 'Received' || o.payment_status === 'Received') && ((o.paymentMode && o.paymentMode !== 'Cash') || (o.payment_mode && o.payment_mode !== 'Cash')))
+            .reduce((sum, o) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
 
           const deliveredCount = todayOrders.filter(o => ['delivered', 'delivered to cx', 'completed'].includes(String(o.status).toLowerCase())).length;
           const inProcessCount = todayOrders.filter(o => ['processing', 'washing', 'drying', 'ironing'].includes(String(o.status).toLowerCase())).length;
