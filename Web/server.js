@@ -539,6 +539,7 @@ const OrderSchema = new mongoose.Schema({
     pickupCode: { type: String, default: null },
     deliveryCode: { type: String, default: null },
     slot: { type: String, default: null },
+    sourceSegment: { type: String, default: null }, // 'NP' (NewsPaper), 'SM' (Social Media), 'RF' (Reference), 'WS' (Website), 'AP' (App)
 
     // Exact underscore-cased keys for Power BI / Excel dashboards
     customer_id: String,
@@ -805,7 +806,8 @@ const CustomerSchema = new mongoose.Schema({
     referralCode: { type: String, unique: true, sparse: true },
     referredBy: { type: String, default: null },
     walletBalance: { type: Number, default: 0 },
-    referralCount: { type: Number, default: 0 }
+    referralCount: { type: Number, default: 0 },
+    sourceSegment: { type: String, default: null } // 'NP', 'SM', 'RF', 'WS', 'AP'
 });
 const Customer = mongoose.model('Customer', CustomerSchema);
 
@@ -982,13 +984,15 @@ app.post('/api/otp/verify', async (req, res) => {
                 customer = new Customer({
                     phone: cleanPhone,
                     name: name || '',
-                    accountType: accountType || 'Residential'
+                    accountType: accountType || 'Residential',
+                    sourceSegment: req.body.sourceSegment || null
                 });
                 await customer.save();
                 isNewUser = true;
-            } else if (name || accountType) {
+            } else if (name || accountType || req.body.sourceSegment) {
                 if (name) customer.name = name;
                 if (accountType) customer.accountType = accountType;
+                if (req.body.sourceSegment) customer.sourceSegment = req.body.sourceSegment;
                 await customer.save();
             }
 
@@ -1016,7 +1020,7 @@ app.post('/api/otp/verify', async (req, res) => {
                 accountType: customer.accountType,
                 authProvider: customer.authProvider || 'phone'
             }, process.env.JWT_SECRET, { expiresIn: '30d' });
-            res.json({ token, role: userRole, name: customer.name, phone: cleanPhone, accountType: customer.accountType, profilePicture: customer.profilePicture, referralCode: customer.referralCode, isNewUser });
+            res.json({ token, role: userRole, name: customer.name, phone: cleanPhone, accountType: customer.accountType, profilePicture: customer.profilePicture, referralCode: customer.referralCode, sourceSegment: customer.sourceSegment || null, isNewUser });
         } else {
             res.status(401).json({ error: 'Invalid OTP' });
         }
@@ -1100,6 +1104,7 @@ app.post('/api/auth/google', async (req, res) => {
             accountType: customer.accountType,
             profilePicture: customer.profilePicture,
             referralCode: customer.referralCode,
+            sourceSegment: customer.sourceSegment || null,
             isNewUser,
             needsProfileSetup: !customer.phone || !customer.address || !customer.name
         });
@@ -1121,7 +1126,7 @@ app.get('/api/customer/profile', verifyToken, async (req, res) => {
             customer = await Customer.findOne({ phone: cleanPhone });
         }
         if (!customer) {
-            return res.json({ phone: '', name: req.user.name || 'Laundry Basket User', profilePicture: null, accountType: 'Residential', address: '' });
+            return res.json({ phone: '', name: req.user.name || 'Laundry Basket User', profilePicture: null, accountType: 'Residential', address: '', sourceSegment: null });
         }
         res.json(customer);
     } catch (err) {
@@ -1132,7 +1137,7 @@ app.get('/api/customer/profile', verifyToken, async (req, res) => {
 // POST: Update Customer Profile
 app.post('/api/customer/profile', verifyToken, async (req, res) => {
     if (req.user.role !== 'customer') return res.status(403).json({ error: 'Customer only' });
-    const { name, phone, address, accountType, profilePicture } = req.body;
+    const { name, phone, address, accountType, profilePicture, sourceSegment } = req.body;
     try {
         let customer;
         if (req.user.authProvider === 'google') {
@@ -1155,6 +1160,7 @@ app.post('/api/customer/profile', verifyToken, async (req, res) => {
         if (address !== undefined) customer.address = address;
         if (accountType) customer.accountType = accountType;
         if (profilePicture !== undefined) customer.profilePicture = profilePicture;
+        if (sourceSegment) customer.sourceSegment = sourceSegment;
         await customer.save();
         
         res.json({ success: true, customer });
@@ -1889,8 +1895,31 @@ app.post('/api/orders', async (req, res) => {
                 }
             }
         }
-        const generatedPickupCode = String(Math.floor(1000 + Math.random() * 9000));
-        const generatedDeliveryCode = String(Math.floor(1000 + Math.random() * 9000));
+        // If Walk-in or WhatsApp order, completely remove pickup and delivery OTP feature
+        const orderSource = (req.body.source || '').toLowerCase();
+        const isWalkInOrWhatsapp = orderSource.includes('walk-in') || orderSource.includes('whatsapp') ||
+                                   (req.body.order_type && ['walk-in', 'whatsapp'].includes(req.body.order_type.toLowerCase()));
+
+        const generatedPickupCode = isWalkInOrWhatsapp ? null : String(Math.floor(1000 + Math.random() * 9000));
+        const generatedDeliveryCode = isWalkInOrWhatsapp ? null : String(Math.floor(1000 + Math.random() * 9000));
+
+        // Determine customer acquisition source segment (NP, SM, RF, WS, AP)
+        let finalSourceSegment = req.body.sourceSegment || null;
+        if (!finalSourceSegment && req.body.phone) {
+            try {
+                const cleanPh = req.body.phone.replace(/\D/g, '').slice(-10);
+                const cxRecord = await Customer.findOne({ phone: cleanPh });
+                if (cxRecord && cxRecord.sourceSegment) {
+                    finalSourceSegment = cxRecord.sourceSegment;
+                }
+            } catch (e) {}
+        }
+        if (!finalSourceSegment) {
+            if (orderSource.includes('app')) finalSourceSegment = 'AP';
+            else if (orderSource.includes('web')) finalSourceSegment = 'WS';
+            else if (orderSource.includes('whatsapp')) finalSourceSegment = 'SM';
+            else if (orderSource.includes('walk-in')) finalSourceSegment = 'RF';
+        }
 
         // Delivery Charge & Distance Calculation - Safe Numeric Parsing
         const distanceKm = Number(req.body.distanceKm) || 0;
@@ -1928,8 +1957,9 @@ app.post('/api/orders', async (req, res) => {
             deliveryFee: deliveryFee,
             total: finalTotal,
             status: orderStatus,
-            pickupCode: req.body.pickupCode || generatedPickupCode,
-            deliveryCode: req.body.deliveryCode || generatedDeliveryCode,
+            pickupCode: isWalkInOrWhatsapp ? null : (req.body.pickupCode || generatedPickupCode),
+            deliveryCode: isWalkInOrWhatsapp ? null : (req.body.deliveryCode || generatedDeliveryCode),
+            sourceSegment: finalSourceSegment,
             pickupPhoto: req.body.pickupPhoto || null,
             placedBy: req.body.placedBy || (isRiderPlacement ? 'rider' : 'Customer'),
             pickupRiderId: req.body.pickupRiderId || null,

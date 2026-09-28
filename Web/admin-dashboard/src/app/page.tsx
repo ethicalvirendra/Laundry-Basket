@@ -448,7 +448,7 @@ const SOCKET_BASE = typeof window !== 'undefined' && (window.location.hostname =
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'riders' | 'rates' | 'support' | 'inventory' | 'config' | 'business-stats'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'riders' | 'rates' | 'support' | 'inventory' | 'config' | 'business-stats' | 'legacy-history'>('overview');
   const [activeStoreId, setActiveStoreId] = useState('all');
   const [activeDateFilter, setActiveDateFilter] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
@@ -457,6 +457,9 @@ export default function AdminDashboard() {
   const [inventoryForm, setInventoryForm] = useState({ item: '', qty: '', unit: '' });
   const [stats, setStats] = useState<any>({ totalRevenue: 0, totalOrders: 0, activeOrders: 0, totalStores: 0 });
   const [orders, setOrders] = useState<any[]>([]);
+  const [legacyOrders, setLegacyOrders] = useState<any[]>([]);
+  const [legacyLoading, setLegacyLoading] = useState(false);
+  const [legacySearchQuery, setLegacySearchQuery] = useState('');
   const dailyEarningsData = useMemo(() => {
     const dailyMap: { [date: string]: { amount: number; count: number } } = {};
     orders.forEach(o => {
@@ -650,6 +653,15 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('lb_auth_token');
       const authHeader = { 'Authorization': `Bearer ${token}` };
 
+      if (activeTab === 'legacy-history') {
+        setLegacyLoading(true);
+        try {
+          const legacyRes = await fetch(`${API_BASE}/orders?history=1&storeId=${storeFilter}&date=${dateFilter}`, { headers: authHeader });
+          if (legacyRes.status === 401) { localStorage.clear(); window.location.href = "/admin/login"; return; }
+          const legacyData = await legacyRes.json();
+          if (Array.isArray(legacyData)) setLegacyOrders(legacyData);
+        } catch (e) { console.error(e); } finally { setLegacyLoading(false); }
+      }
       if (activeTab === 'overview' || activeTab === 'business-stats') {
         const statsRes = await fetch(`${API_BASE}/analytics?storeId=${storeFilter}&date=${dateFilter}`, { headers: authHeader });
         if (statsRes.status === 401) { localStorage.clear(); window.location.href = "/admin/login"; return; }
@@ -820,6 +832,158 @@ export default function AdminDashboard() {
       a.click();
       a.remove();
     } catch (err) { alert("Excel Export failed: " + err); }
+  };
+
+  const exportInventoryExcel = () => {
+    try {
+      const targetItems = filteredInventory.length > 0 ? filteredInventory : inventory;
+      if (!targetItems || targetItems.length === 0) {
+        alert("No inventory records available to export.");
+        return;
+      }
+
+      const generatedOn = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+      // 1. Detailed Inventory Sheet
+      const inventoryRows = targetItems.map((item, idx) => {
+        const storeObj = stores.find(s => s.id === item.storeId);
+        const branchName = item.storeId === 'GLOBAL' 
+          ? 'Global Warehouse' 
+          : (storeObj?.name || item.storeId || 'Main Branch');
+        const branchCode = storeObj?.branchCode || (item.storeId === 'GLOBAL' ? 'WH-CENTRAL' : item.storeId);
+        const qty = Number(item.quantity ?? item.qty) || 0;
+        
+        let stockStatus = 'In Stock';
+        let alertLevel = 'Adequate';
+        if (qty <= 0) {
+          stockStatus = 'Out of Stock';
+          alertLevel = 'CRITICAL (Empty)';
+        } else if (qty <= 10) {
+          stockStatus = 'Low Stock';
+          alertLevel = 'ATTENTION (Refill Needed)';
+        }
+
+        return {
+          'S.No': idx + 1,
+          'Branch / Location': branchName,
+          'Branch Code': branchCode,
+          'Store ID': item.storeId || 'GLOBAL',
+          'Material Item': item.item || 'N/A',
+          'Current Quantity': qty,
+          'Unit': item.unit || 'Units',
+          'Stock Status': stockStatus,
+          'Alert Priority': alertLevel,
+          'Last Updated': item.lastUpdated || 'N/A',
+          'Report Generated At': generatedOn
+        };
+      });
+
+      const wsInv = XLSX.utils.json_to_sheet(inventoryRows);
+      wsInv['!cols'] = [
+        { wch: 6 },  // S.No
+        { wch: 25 }, // Branch / Location
+        { wch: 14 }, // Branch Code
+        { wch: 14 }, // Store ID
+        { wch: 26 }, // Material Item
+        { wch: 18 }, // Current Quantity
+        { wch: 10 }, // Unit
+        { wch: 14 }, // Stock Status
+        { wch: 28 }, // Alert Priority
+        { wch: 22 }, // Last Updated
+        { wch: 24 }  // Report Generated At
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsInv, "Detailed_Inventory");
+
+      // 2. Stock Requests History Sheet
+      if (stockRequests && stockRequests.length > 0) {
+        const relevantRequests = inventoryStoreFilter === 'GLOBAL' 
+          ? stockRequests 
+          : stockRequests.filter(r => r.storeId === inventoryStoreFilter);
+
+        const requestsRows = (relevantRequests.length > 0 ? relevantRequests : stockRequests).map((req, idx) => ({
+          'S.No': idx + 1,
+          'Request ID': req.id || `REQ-${idx + 1}`,
+          'Branch Name': req.storeName || (stores.find(s => s.id === req.storeId)?.name) || req.storeId,
+          'Store ID': req.storeId,
+          'Requested Material': req.item || 'N/A',
+          'Requested Quantity': Number(req.quantity) || 0,
+          'Unit': req.unit || 'kg',
+          'Request Status': req.status || 'Pending',
+          'Date Requested': req.createdAt || req.timestamp ? new Date(req.createdAt || req.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A',
+          'Store Notes / Reason': req.notes || '-'
+        }));
+
+        const wsReq = XLSX.utils.json_to_sheet(requestsRows);
+        wsReq['!cols'] = [
+          { wch: 6 },  // S.No
+          { wch: 16 }, // Request ID
+          { wch: 24 }, // Branch Name
+          { wch: 14 }, // Store ID
+          { wch: 24 }, // Requested Material
+          { wch: 18 }, // Requested Quantity
+          { wch: 10 }, // Unit
+          { wch: 16 }, // Request Status
+          { wch: 24 }, // Date Requested
+          { wch: 30 }  // Store Notes / Reason
+        ];
+        XLSX.utils.book_append_sheet(wb, wsReq, "Stock_Requests_Log");
+      }
+
+      // 3. Summary By Branch Sheet
+      const branchSummaryMap: { [key: string]: { name: string; totalItems: number; lowStock: number; outOfStock: number; pendingReqs: number } } = {};
+      
+      targetItems.forEach(item => {
+        const sId = item.storeId || 'GLOBAL';
+        const sName = sId === 'GLOBAL' ? 'Global Warehouse' : (stores.find(s => s.id === sId)?.name || sId);
+        if (!branchSummaryMap[sId]) {
+          branchSummaryMap[sId] = { name: sName, totalItems: 0, lowStock: 0, outOfStock: 0, pendingReqs: 0 };
+        }
+        branchSummaryMap[sId].totalItems += 1;
+        const q = Number(item.quantity ?? item.qty) || 0;
+        if (q <= 0) branchSummaryMap[sId].outOfStock += 1;
+        else if (q <= 10) branchSummaryMap[sId].lowStock += 1;
+      });
+
+      stockRequests.forEach(r => {
+        const sId = r.storeId || 'GLOBAL';
+        if (branchSummaryMap[sId] && r.status === 'Pending') {
+          branchSummaryMap[sId].pendingReqs += 1;
+        }
+      });
+
+      const summaryRows = Object.keys(branchSummaryMap).map((sId, idx) => ({
+        'S.No': idx + 1,
+        'Branch / Store': branchSummaryMap[sId].name,
+        'Store ID': sId,
+        'Total Tracked Items': branchSummaryMap[sId].totalItems,
+        'Low Stock Items': branchSummaryMap[sId].lowStock,
+        'Out of Stock Items': branchSummaryMap[sId].outOfStock,
+        'Pending Refill Requests': branchSummaryMap[sId].pendingReqs
+      }));
+
+      if (summaryRows.length > 0) {
+        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+        wsSummary['!cols'] = [
+          { wch: 6 },
+          { wch: 25 },
+          { wch: 14 },
+          { wch: 20 },
+          { wch: 18 },
+          { wch: 18 },
+          { wch: 24 }
+        ];
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Branch_Stock_Summary");
+      }
+
+      const filterLabel = inventoryStoreFilter === 'GLOBAL' ? 'Global' : (stores.find(s => s.id === inventoryStoreFilter)?.name || inventoryStoreFilter).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Admin_Inventory_Report_${filterLabel}_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error("Export Inventory failed:", err);
+      alert("Inventory Export failed: " + err);
+    }
   };
 
   const handleSaveRider = async () => {
@@ -1171,10 +1335,11 @@ export default function AdminDashboard() {
 
             <button 
               className="glass px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-white/60 transition-all flex items-center gap-2" 
-              onClick={exportToExcel}
+              onClick={activeTab === 'inventory' ? exportInventoryExcel : exportToExcel}
+              title={activeTab === 'inventory' ? "Export Detailed Inventory Report (.xlsx)" : "Export Global Orders Report (.xlsx)"}
             >
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              Export Excel
+              {activeTab === 'inventory' ? "Export Inventory Excel" : "Export Excel"}
             </button>
             {activeTab === 'shops' && <button className="btn-primary shadow-xl shadow-primary/20" onClick={() => { setEditingStoreId(null); setStoreForm({ name: '', address: '', user: '', pass: '', mapUrl: '', branchCode: '' }); setShowStoreModal(true); }}>Add New Branch</button>}
             {activeTab === 'riders' && <button className="btn-primary shadow-xl shadow-primary/20" onClick={() => { setRiderForm({ name: '', username: '', password: '', phone: '', storeId: '' }); setShowRiderModal(true); }}>Add New Rider</button>}
@@ -1255,6 +1420,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Qty</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Service Type</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5 border-r border-black/8">Status</th>
+                    <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Proof Photos</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-red-500/5">Action</th>
                   </tr>
                 </thead>
@@ -1273,11 +1439,12 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
+                        <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
                       </tr>
                     ))
                   ) : filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-text-secondary font-bold uppercase tracking-wider text-xs">
+                      <td colSpan={12} className="p-8 text-center text-text-secondary font-bold uppercase tracking-wider text-xs">
                         No orders matching search query
                       </td>
                     </tr>
@@ -1328,6 +1495,40 @@ export default function AdminDashboard() {
                           <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-violet-500/[0.02]">{service}</td>
                           <td className="px-4 py-2.5 whitespace-nowrap bg-violet-500/[0.02] border-r border-black/5">
                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${statusBadgeClass}`}>{status === 'Delivered to Cx' ? 'Delivered' : status}</span>
+                          </td>
+                          {/* Proof Photos */}
+                          <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
+                            <div className="flex items-center gap-1.5">
+                              {o.pickupPhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const w = window.open("");
+                                    w?.document.write(`<title>Pickup Photo #${o.id}</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${o.pickupPhoto}" style="max-width:100%;max-height:100%;object-fit:contain;"/></body>`);
+                                  }}
+                                  className="text-[8px] font-black px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white uppercase transition-all shadow-sm"
+                                  title="View Pickup Photo"
+                                >
+                                  📦 Pickup
+                                </button>
+                              )}
+                              {o.deliveryPhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const w = window.open("");
+                                    w?.document.write(`<title>Delivery Photo #${o.id}</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${o.deliveryPhoto}" style="max-width:100%;max-height:100%;object-fit:contain;"/></body>`);
+                                  }}
+                                  className="text-[8px] font-black px-2 py-1 rounded bg-green-500/10 text-green-700 border border-green-500/20 hover:bg-green-600 hover:text-white uppercase transition-all shadow-sm"
+                                  title="View Delivery Photo"
+                                >
+                                  ✅ Delivery
+                                </button>
+                              )}
+                              {!o.pickupPhoto && !o.deliveryPhoto && (
+                                <span className="text-text-secondary/40 text-[9px] font-bold">None</span>
+                              )}
+                            </div>
                           </td>
                           {/* Actions */}
                           <td className="px-4 py-2.5 whitespace-nowrap">
@@ -1443,8 +1644,8 @@ export default function AdminDashboard() {
         )}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center px-2">
-              <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-2 gap-4">
+              <div className="flex gap-4 items-center flex-wrap">
                 <select 
                   className="glass px-4 py-2 text-xs font-black uppercase rounded-xl border-none outline-none"
                   value={inventoryStoreFilter}
@@ -1456,6 +1657,13 @@ export default function AdminDashboard() {
                   <option value="GLOBAL">Global Warehouse</option>
                   {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
+                <button 
+                  className="glass px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-white/60 transition-all flex items-center gap-2 text-primary border border-primary/20 shadow-sm"
+                  onClick={exportInventoryExcel}
+                  title="Download complete detailed inventory report in Excel (.xlsx)"
+                >
+                  <span>📊</span> Export Inventory Report (.xlsx)
+                </button>
               </div>
               <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest">
                 Viewing inventory for: <span className="text-primary">{inventoryStoreFilter === 'GLOBAL' ? 'Main Warehouse' : stores.find(s => s.id === inventoryStoreFilter)?.name}</span>

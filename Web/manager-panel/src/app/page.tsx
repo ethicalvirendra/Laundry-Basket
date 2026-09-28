@@ -360,7 +360,8 @@ export default function ManagerPanel() {
     paymentStatus: 'Unpaid',
     assignedRiderId: '',
     searchQuery: '',
-    cx_type: 'Residential'
+    cx_type: 'Residential',
+    sourceSegment: 'RF'
   });
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -443,7 +444,8 @@ export default function ManagerPanel() {
     discount: '0',
     source: 'Walk-in',
     address: '',
-    cx_type: 'Residential'
+    cx_type: 'Residential',
+    sourceSegment: 'RF'
   });
 
   // Manual line inputs (manager-only): name, price, qty, type
@@ -1303,7 +1305,8 @@ export default function ManagerPanel() {
       paymentStatus: order.paymentStatus || 'Unpaid',
       assignedRiderId: order.assignedRiderId || '',
       searchQuery: '',
-      cx_type: order.cx_type || (order.source === 'Business' ? 'Business' : 'Residential')
+      cx_type: order.cx_type || (order.source === 'Business' ? 'Business' : 'Residential'),
+      sourceSegment: order.sourceSegment || (order.source === 'WhatsApp' ? 'SM' : 'RF')
     });
     setShowEditOrderModal(true);
   };
@@ -1343,6 +1346,8 @@ export default function ManagerPanel() {
         status: editOrderForm.status,
         paymentStatus: editOrderForm.paymentStatus,
         assignedRiderId: editOrderForm.assignedRiderId || null,
+        source: editOrderForm.source,
+        sourceSegment: editOrderForm.sourceSegment || 'RF',
         cx_type: editOrderForm.cx_type
       };
 
@@ -1404,6 +1409,7 @@ export default function ManagerPanel() {
         status: walkinForm.source === 'Walk-in' ? 'Processing' : 'Pending',
         timestamp: walkinForm.timestamp || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
         source: walkinForm.source,
+        sourceSegment: walkinForm.sourceSegment || (walkinForm.source === 'WhatsApp' ? 'SM' : 'RF'),
         totalMode: walkinForm.totalMode,
         adjustment: walkinForm.adjustment,
         cx_type: walkinForm.cx_type || 'Residential'
@@ -1419,7 +1425,7 @@ export default function ManagerPanel() {
         const createdOrder = await res.json();
         trackEvent('walkin_order_created', { total: newOrder.total, services: newOrder.services });
         setShowWalkinModal(false);
-        setWalkinForm({ name: '', phone: '', selectedServices: [], total: '0', totalMode: 'auto', adjustment: '', timestamp: '', searchQuery: '', discount: '0', source: 'Walk-in', address: '', cx_type: 'Residential' });
+        setWalkinForm({ name: '', phone: '', selectedServices: [], total: '0', totalMode: 'auto', adjustment: '', timestamp: '', searchQuery: '', discount: '0', source: 'Walk-in', address: '', cx_type: 'Residential', sourceSegment: 'RF' });
         setSelectedRepeatCustomer(null);
         setDetectedCustomer(null);
         setCxSearchQuery('');
@@ -2551,7 +2557,24 @@ export default function ManagerPanel() {
                             <td className="px-4 py-2.5 font-black text-primary whitespace-nowrap bg-blue-500/[0.02]">{cxId}</td>
                             <td className="px-4 py-2.5 font-bold whitespace-nowrap bg-blue-500/[0.02]">{cxName}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-blue-500/[0.02]">
-                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${cxBadgeClass}`}>{cxType}</span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${cxBadgeClass}`}>{cxType}</span>
+                                {o.sourceSegment && (
+                                  <span className={`text-[7.5px] font-black px-1.5 py-0.2 rounded uppercase border ${
+                                    o.sourceSegment === 'NP' ? 'bg-amber-500/15 text-amber-700 border-amber-500/30' :
+                                    o.sourceSegment === 'SM' ? 'bg-pink-500/15 text-pink-700 border-pink-500/30' :
+                                    o.sourceSegment === 'RF' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30' :
+                                    o.sourceSegment === 'AP' ? 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30' :
+                                    'bg-cyan-500/15 text-cyan-700 border-cyan-500/30'
+                                  }`}>
+                                    {o.sourceSegment === 'NP' ? 'NP · NewsPaper' :
+                                     o.sourceSegment === 'SM' ? 'SM · Social' :
+                                     o.sourceSegment === 'RF' ? 'RF · Ref' :
+                                     o.sourceSegment === 'WS' ? 'WS · Web' :
+                                     o.sourceSegment === 'AP' ? 'AP · App' : o.sourceSegment}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-blue-500/[0.02] border-r border-black/5">{mobile}</td>
                             <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-violet-500/[0.02]">{orderDate}</td>
@@ -3490,15 +3513,15 @@ export default function ManagerPanel() {
                     onChange={e => setWalkinForm({ ...walkinForm, phone: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Order Source</label>
                     <div className="flex gap-2 mt-1">
                       {['Walk-in', 'WhatsApp'].map(src => (
                         <button key={src} type="button"
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex-1 ${walkinForm.source === src ? (src === 'WhatsApp' ? 'bg-[#25D366] text-white border-[#25D366]' : 'bg-primary text-white border-primary') : 'bg-white/50 border-black/10 text-text-secondary hover:border-primary/30'
+                          className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex-1 ${walkinForm.source === src ? (src === 'WhatsApp' ? 'bg-[#25D366] text-white border-[#25D366]' : 'bg-primary text-white border-primary') : 'bg-white/50 border-black/10 text-text-secondary hover:border-primary/30'
                             }`}
-                          onClick={() => setWalkinForm({ ...walkinForm, source: src })}
+                          onClick={() => setWalkinForm({ ...walkinForm, source: src, sourceSegment: src === 'WhatsApp' ? 'SM' : (walkinForm.sourceSegment || 'RF') })}
                         >
                           {src === 'WhatsApp' && <i className="fab fa-whatsapp mr-1 text-sm"></i>}
                           {src}
@@ -3509,12 +3532,26 @@ export default function ManagerPanel() {
                   <div>
                     <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Account Type</label>
                     <select
-                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 mt-1 text-xs font-black uppercase outline-none focus:border-primary transition-colors cursor-pointer"
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-3 py-2.5 mt-1 text-xs font-black uppercase outline-none focus:border-primary transition-colors cursor-pointer"
                       value={walkinForm.cx_type || 'Residential'}
                       onChange={e => setWalkinForm({ ...walkinForm, cx_type: e.target.value })}
                     >
                       <option value="Residential">Residential</option>
                       <option value="Business">Business</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Acquisition Segment</label>
+                    <select
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-3 py-2.5 mt-1 text-xs font-black uppercase outline-none focus:border-primary transition-colors cursor-pointer"
+                      value={walkinForm.sourceSegment || (walkinForm.source === 'WhatsApp' ? 'SM' : 'RF')}
+                      onChange={e => setWalkinForm({ ...walkinForm, sourceSegment: e.target.value })}
+                    >
+                      <option value="NP">NP · NewsPaper</option>
+                      <option value="SM">SM · Social Media</option>
+                      <option value="RF">RF · Reference</option>
+                      <option value="WS">WS · Website Directly</option>
+                      <option value="AP">AP · App Directly</option>
                     </select>
                   </div>
                 </div>
@@ -3829,7 +3866,7 @@ export default function ManagerPanel() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Order Source</label>
                     <select
@@ -3852,6 +3889,20 @@ export default function ManagerPanel() {
                     >
                       <option value="Residential">Residential</option>
                       <option value="Business">Business</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Acquisition Segment</label>
+                    <select
+                      value={editOrderForm.sourceSegment || "RF"}
+                      onChange={e => setEditOrderForm({ ...editOrderForm, sourceSegment: e.target.value })}
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-3 text-xs font-black uppercase outline-none focus:border-primary transition-colors cursor-pointer"
+                    >
+                      <option value="NP">NP · NewsPaper</option>
+                      <option value="SM">SM · Social Media</option>
+                      <option value="RF">RF · Reference</option>
+                      <option value="WS">WS · Website Directly</option>
+                      <option value="AP">AP · App Directly</option>
                     </select>
                   </div>
                 </div>
@@ -4293,7 +4344,7 @@ export default function ManagerPanel() {
                         )}
                       </div>
                     )}
-                    {(selectedOrder.pickupCode || selectedOrder.deliveryCode) && (
+                    {!((selectedOrder.source && ['walk-in', 'whatsapp'].includes(selectedOrder.source.toLowerCase()))) && (selectedOrder.pickupCode || selectedOrder.deliveryCode) && (
                       <div className="mt-2 flex gap-2">
                         {selectedOrder.pickupCode && (
                           <div className="text-[10px] font-bold text-text-primary bg-green-50 px-2.5 py-1.5 rounded-lg inline-flex flex-col gap-0.5 border border-green-200">
@@ -4319,6 +4370,21 @@ export default function ManagerPanel() {
                         selectedOrder.source === 'Walk-in' ? 'bg-green-500/10 text-green-600' :
                           'bg-blue-500/10 text-blue-600'
                       }`}>{selectedOrder.source || 'Web'}</span>
+                    {selectedOrder.sourceSegment && (
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase mt-2 ml-1.5 inline-block ${
+                        selectedOrder.sourceSegment === 'NP' ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30' :
+                        selectedOrder.sourceSegment === 'SM' ? 'bg-pink-500/15 text-pink-700 border border-pink-500/30' :
+                        selectedOrder.sourceSegment === 'RF' ? 'bg-emerald-500/15 text-emerald-700 border border-emerald-500/30' :
+                        selectedOrder.sourceSegment === 'AP' ? 'bg-indigo-500/15 text-indigo-700 border border-indigo-500/30' :
+                        'bg-cyan-500/15 text-cyan-700 border border-cyan-500/30'
+                      }`}>
+                        {selectedOrder.sourceSegment === 'NP' ? 'NP · NewsPaper' :
+                         selectedOrder.sourceSegment === 'SM' ? 'SM · Social Media' :
+                         selectedOrder.sourceSegment === 'RF' ? 'RF · Reference' :
+                         selectedOrder.sourceSegment === 'WS' ? 'WS · Website Directly' :
+                         selectedOrder.sourceSegment === 'AP' ? 'AP · App Directly' : selectedOrder.sourceSegment}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -5154,6 +5220,21 @@ function OrderCard({ order, riders, onAssign, onUpdate, onView, onPrint, onPdf, 
             <span className={`text-[7.5px] font-black px-1.5 py-0.5 rounded uppercase border ${order.source === 'App' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : order.source === 'Walk-in' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'}`}>
               {order.source || 'Web'}
             </span>
+            {order.sourceSegment && (
+              <span className={`text-[7.5px] font-black px-1.5 py-0.5 rounded uppercase border ${
+                order.sourceSegment === 'NP' ? 'bg-amber-500/15 text-amber-700 border-amber-500/30' :
+                order.sourceSegment === 'SM' ? 'bg-pink-500/15 text-pink-700 border-pink-500/30' :
+                order.sourceSegment === 'RF' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30' :
+                order.sourceSegment === 'AP' ? 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30' :
+                'bg-cyan-500/15 text-cyan-700 border-cyan-500/30'
+              }`}>
+                {order.sourceSegment === 'NP' ? 'NP · NewsPaper' :
+                 order.sourceSegment === 'SM' ? 'SM · Social' :
+                 order.sourceSegment === 'RF' ? 'RF · Ref' :
+                 order.sourceSegment === 'WS' ? 'WS · Web' :
+                 order.sourceSegment === 'AP' ? 'AP · App' : order.sourceSegment}
+              </span>
+            )}
           </div>
           <span className="text-[8px] font-bold text-text-secondary uppercase mt-0.5 block">
             🕒 {(() => {
@@ -5186,8 +5267,8 @@ function OrderCard({ order, riders, onAssign, onUpdate, onView, onPrint, onPdf, 
         <p className="text-[10px] text-text-secondary mt-0.5 font-medium">{order.name} · {order.phone}</p>
       </div>
 
-      {/* Pickup/Delivery OTP Section */}
-      {(order.pickupCode || order.deliveryCode) && (
+      {/* Pickup/Delivery OTP Section - Hidden for Walk-in & WhatsApp */}
+      {!((order.source && ['walk-in', 'whatsapp'].includes(order.source.toLowerCase()))) && (order.pickupCode || order.deliveryCode) && (
         <div className="mb-2.5 bg-primary/5 border border-primary/10 rounded-xl p-1.5 flex justify-between gap-2 text-center">
           {order.pickupCode && (
             <div className="flex-1">
