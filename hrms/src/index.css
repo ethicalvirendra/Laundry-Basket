@@ -101,6 +101,10 @@ body {
   border-left: 5px solid var(--accent-purple) !important;
 }
 
+.glass-card-cyan {
+  border-left: 5px solid #06b6d4 !important;
+}
+
 /* Form Controls & Buttons in Light Glass */
 .glass-input {
   background: rgba(255, 255, 255, 0.6) !important;

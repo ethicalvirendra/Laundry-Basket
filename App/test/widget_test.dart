@@ -12,7 +12,7 @@ import 'package:laundry_basket_app/main.dart';
 void main() {
   testWidgets('Login screen smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const LaundryBasketApp(isLoggedIn: false));
+    await tester.pumpWidget(const LaundryBasketApp(isLoggedIn: false, needsProfileSetup: false));
 
     // Verify that the login screen shows the welcome message.
     expect(find.text('Welcome Back'), findsOneWidget);

@@ -53,8 +53,21 @@ export default function DashboardOverview({ setActiveTab, staffList, payrollList
   // Dynamic stats calculations
   const totalStaff = staffList.length;
   
-  // Calculate attendance dynamically
-  const onLeaveToday = leavesList.filter(l => l.status === 'Approved' && l.dates.toLowerCase().includes('june')).length;
+  // Calculate attendance dynamically — handles both DB (startDate/endDate) and legacy (dates string) formats
+  const todayStr = new Date().toISOString().split('T')[0];
+  const onLeaveToday = leavesList.filter(l => {
+    if (l.status !== 'Approved') return false;
+    if (l.startDate && l.endDate) {
+      // DB format: compare ISO date strings directly
+      return l.startDate <= todayStr && todayStr <= l.endDate;
+    }
+    // Legacy local format: approximate by checking the month string
+    if (l.dates) {
+      const currentMonthName = new Date().toLocaleString('en-US', { month: 'long' }).toLowerCase();
+      return l.dates.toLowerCase().includes(currentMonthName);
+    }
+    return false;
+  }).length;
   const presentCount = Math.max(0, totalStaff - onLeaveToday);
   const attendanceRate = totalStaff > 0 ? ((presentCount / totalStaff) * 100).toFixed(1) : '100';
 

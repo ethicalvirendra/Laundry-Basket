@@ -503,12 +503,18 @@ const initialWeeklyShifts = buildWeeklyShifts(initialStaff);
 // Payroll generated from staff data — clean slate, no test numbers
 const initialRidersPayroll = initialStaff.map((emp, i) => ({
   id: i + 1,
+  empId: emp.empId,
   name: emp.name,
   role: emp.role,
   base: emp.salary,
   deliveries: 0,
   rate: emp.incentive,
-  paidStatus: 'Pending'
+  paidStatus: 'Pending',
+  incentives: 0,
+  allowance: 0,
+  deductions: 0,
+  netSalary: emp.salary,
+  month: ''
 }));
 
 // Clean slate — no test data
@@ -582,30 +588,36 @@ export default function App() {
 
   const mapPayrollFromDb = (row: any) => ({
     id: Number(row.id),
-    empId: row.emp_id,
+    empId: row.emp_id || '',
     name: row.name,
     role: row.role,
-    baseSalary: Number(row.base_salary),
-    incentives: Number(row.incentives),
-    allowance: Number(row.allowance),
-    deductions: Number(row.deductions),
-    netSalary: Number(row.net_salary),
-    status: row.status,
-    month: row.month
+    // Use 'base' and 'paidStatus' to match PayrollIncentives component field names
+    base: Number(row.base_salary) || 0,
+    paidStatus: row.status || 'Pending',
+    deliveries: Number(row.deliveries) || 0,
+    rate: Number(row.rate) || 0,
+    incentives: Number(row.incentives) || 0,
+    allowance: Number(row.allowance) || 0,
+    deductions: Number(row.deductions) || 0,
+    netSalary: Number(row.net_salary) || 0,
+    month: row.month || ''
   });
 
   const mapPayrollToDb = (p: any) => ({
     id: p.id,
-    emp_id: p.empId,
+    emp_id: p.empId || '',
     name: p.name,
     role: p.role,
-    base_salary: p.baseSalary,
-    incentives: p.incentives,
-    allowance: p.allowance,
-    deductions: p.deductions,
-    net_salary: p.netSalary,
-    status: p.status,
-    month: p.month
+    // Read from component field names ('base'/'paidStatus') or fallback to DB names
+    base_salary: p.base ?? p.baseSalary ?? 0,
+    status: p.paidStatus || p.status || 'Pending',
+    deliveries: p.deliveries || 0,
+    rate: p.rate || 0,
+    incentives: p.incentives || 0,
+    allowance: p.allowance || 0,
+    deductions: p.deductions || 0,
+    net_salary: p.netSalary ?? p.base ?? 0,
+    month: p.month || ''
   });
 
   const mapLeaveFromDb = (row: any) => ({
@@ -662,22 +674,30 @@ export default function App() {
 
   const mapTaskFromDb = (row: any) => ({
     id: Number(row.id),
-    title: row.title,
-    description: row.description,
-    assignee: row.assignee,
-    dueDate: row.due_date,
-    priority: row.priority,
-    status: row.status
+    // Map DB column names to TasksManagement component interface field names
+    employeeName: row.assignee || row.employee_name || '',
+    role: row.role || '',
+    taskTitle: row.title || '',
+    taskDesc: row.description || '',
+    assignedDate: row.due_date || row.assigned_date || new Date().toISOString().split('T')[0],
+    status: (row.status === 'Completed' || row.status === 'Pending') ? row.status : 'Pending',
+    completionReport: row.completion_report || '',
+    completedAt: row.completed_at || ''
   });
 
   const mapTaskToDb = (t: any) => ({
     id: t.id,
-    title: t.title,
-    description: t.description,
-    assignee: t.assignee,
-    due_date: t.dueDate,
-    priority: t.priority,
-    status: t.status
+    // Map TasksManagement component field names back to DB columns
+    assignee: t.employeeName || t.assignee || '',
+    employee_name: t.employeeName || '',
+    role: t.role || '',
+    title: t.taskTitle || t.title || '',
+    description: t.taskDesc || t.description || '',
+    due_date: t.assignedDate || t.dueDate || '',
+    priority: t.priority || 'Normal',
+    status: t.status || 'Pending',
+    completion_report: t.completionReport || '',
+    completed_at: t.completedAt || ''
   });
 
   // Supabase Sync Wrappers for User Operations
