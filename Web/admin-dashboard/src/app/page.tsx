@@ -448,7 +448,7 @@ const SOCKET_BASE = typeof window !== 'undefined' && (window.location.hostname =
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'riders' | 'rates' | 'support' | 'inventory' | 'config' | 'business-stats' | 'legacy-history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'riders' | 'rates' | 'support' | 'inventory' | 'config' | 'business-stats' | 'legacy-history' | 'pnl'>('overview');
   const [activeStoreId, setActiveStoreId] = useState('all');
   const [activeDateFilter, setActiveDateFilter] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
@@ -460,6 +460,29 @@ export default function AdminDashboard() {
   const [legacyOrders, setLegacyOrders] = useState<any[]>([]);
   const [legacyLoading, setLegacyLoading] = useState(false);
   const [legacySearchQuery, setLegacySearchQuery] = useState('');
+
+  // P&L & Expenses State
+  const [pnlData, setPnlData] = useState<any>(null);
+  const [pnlLoading, setPnlLoading] = useState(false);
+  const [pnlMonth, setPnlMonth] = useState('9');
+  const [pnlYear, setPnlYear] = useState('2026');
+  const [pnlSubTab, setPnlSubTab] = useState<'summary' | 'expenses' | 'funding' | 'services'>('summary');
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseForm, setExpenseForm] = useState({
+    date: '15-09-2026',
+    month: 'Sep',
+    year: 2026,
+    narration: '',
+    amount: '',
+    type: 'opex',
+    subtype: 'office expense',
+    paidBy: 'Sarvesh',
+    paymentMode: 'online',
+    note: ''
+  });
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState('all');
   const dailyEarningsData = useMemo(() => {
     const dailyMap: { [date: string]: { amount: number; count: number } } = {};
     orders.forEach(o => {
@@ -706,6 +729,10 @@ export default function AdminDashboard() {
         const ticketsData = await ticketsRes.json();
         if (Array.isArray(ticketsData)) setTickets(ticketsData);
       }
+
+      if (activeTab === 'pnl') {
+        await fetchPnl(pnlMonth, pnlYear, storeFilter);
+      }
     } catch (err) {
       console.error("Data fetch error:", err);
     } finally {
@@ -832,6 +859,174 @@ export default function AdminDashboard() {
       a.click();
       a.remove();
     } catch (err) { alert("Excel Export failed: " + err); }
+  };
+
+  // --- P&L & Expenses Functions ---
+  const fetchPnl = async (month = pnlMonth, year = pnlYear, storeFilter = activeStoreId) => {
+    setPnlLoading(true);
+    try {
+      const token = localStorage.getItem('lb_auth_token');
+      const authHeader = { 'Authorization': `Bearer ${token}` };
+      const res = await fetch(`${API_BASE}/pnl?month=${month}&year=${year}&storeId=${storeFilter}`, { headers: authHeader });
+      if (res.status === 401) { localStorage.clear(); window.location.href = "/admin/login"; return; }
+      const data = await res.json();
+      if (!data.error) setPnlData(data);
+    } catch (e) {
+      console.error("PnL fetch error:", e);
+    } finally {
+      setPnlLoading(false);
+    }
+  };
+
+  const handleSaveExpense = async () => {
+    if (!expenseForm.narration || !expenseForm.amount) {
+      alert("Please fill narration and amount");
+      return;
+    }
+    try {
+      const token = localStorage.getItem('lb_auth_token');
+      const payload = {
+        ...expenseForm,
+        amount: parseFloat(expenseForm.amount) || 0,
+        year: parseInt(String(expenseForm.year), 10) || 2026,
+        storeId: activeStoreId !== 'all' ? activeStoreId : 'LBBPL'
+      };
+      let res;
+      if (editingExpenseId) {
+        res = await fetch(`${API_BASE}/expenses/${editingExpenseId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(`${API_BASE}/expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+      }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Save failed");
+      }
+      setShowExpenseModal(false);
+      setEditingExpenseId(null);
+      setExpenseForm({
+        date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+        month: 'Sep',
+        year: 2026,
+        narration: '',
+        amount: '',
+        type: 'opex',
+        subtype: 'office expense',
+        paidBy: 'Sarvesh',
+        paymentMode: 'online',
+        note: ''
+      });
+      fetchPnl(pnlMonth, pnlYear, activeStoreId);
+    } catch (err: any) {
+      alert("Save expense failed: " + err.message);
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this expense entry?")) return;
+    try {
+      const token = localStorage.getItem('lb_auth_token');
+      const res = await fetch(`${API_BASE}/expenses/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchPnl(pnlMonth, pnlYear, activeStoreId);
+      } else {
+        const err = await res.json();
+        alert("Delete failed: " + err.error);
+      }
+    } catch (err) {
+      alert("Delete failed: " + err);
+    }
+  };
+
+  const exportPnlExcel = () => {
+    if (!pnlData) return;
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // 1. PnL Summary sheet
+      const summaryRows = [
+        { Metric: 'Report Period', Value: `${pnlData.period?.month || ''} ${pnlData.period?.year || ''}` },
+        { Metric: 'Total Orders', Value: pnlData.revenue?.totalOrders || 0 },
+        { Metric: 'Gross Revenue (₹)', Value: pnlData.revenue?.grossRevenue || 0 },
+        { Metric: 'Discounts (₹)', Value: pnlData.revenue?.totalDiscounts || 0 },
+        { Metric: 'Net Revenue (₹)', Value: pnlData.revenue?.netRevenue || 0 },
+        { Metric: 'Cash Collected (₹)', Value: pnlData.revenue?.cashCollected || 0 },
+        { Metric: 'Online Collected (₹)', Value: pnlData.revenue?.onlineCollected || 0 },
+        { Metric: 'Total Collected (₹)', Value: pnlData.revenue?.totalCollected || 0 },
+        { Metric: 'Pending Collection (₹)', Value: pnlData.revenue?.pendingCollection || 0 },
+        { Metric: '', Value: '' },
+        { Metric: 'OPERATING EXPENSES (OpEx)', Value: '' },
+        ...Object.entries(pnlData.expenses?.opexBreakdown || {}).map(([cat, amt]) => ({
+          Metric: `  ↳ ${cat.toUpperCase()}`,
+          Value: amt
+        })),
+        { Metric: 'Total OpEx (₹)', Value: pnlData.expenses?.totalOpex || 0 },
+        { Metric: '', Value: '' },
+        { Metric: 'OPERATIONAL PROFIT / LOSS (₹)', Value: pnlData.pnl?.operatingProfitLoss || 0 },
+        { Metric: '', Value: '' },
+        { Metric: 'CAPITAL EXPENDITURE (CapEx)', Value: '' },
+        ...Object.entries(pnlData.expenses?.capexBreakdown || {}).map(([cat, amt]) => ({
+          Metric: `  ↳ ${cat.toUpperCase()}`,
+          Value: amt
+        })),
+        { Metric: 'Total CapEx (₹)', Value: pnlData.expenses?.totalCapex || 0 },
+        { Metric: '', Value: '' },
+        { Metric: 'INVESTOR FUNDING RECEIVED (₹)', Value: pnlData.funding?.totalFunding || 0 },
+        { Metric: 'NET CASH FLOW (₹)', Value: pnlData.pnl?.netCashFlow || 0 },
+        { Metric: 'Average Order Value (₹)', Value: pnlData.pnl?.averageOrderValue || 0 },
+        { Metric: 'Break-even Orders Target', Value: pnlData.pnl?.breakEvenOrders || 0 },
+        { Metric: 'Gap to Break-even', Value: pnlData.pnl?.gapToBreakEven || 0 }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      XLSX.utils.book_append_sheet(wb, wsSummary, "P&L_Summary");
+
+      // 2. Expenses Sheet
+      if (pnlData.expenses?.items && pnlData.expenses.items.length > 0) {
+        const expRows = pnlData.expenses.items.map((e: any, idx: number) => ({
+          '#': idx + 1,
+          Date: e.date,
+          Month: e.month,
+          Year: e.year,
+          Narration: e.narration,
+          'Amount (₹)': e.amount,
+          Type: (e.type || 'opex').toUpperCase(),
+          Category: e.subtype,
+          'Paid By': e.paidBy,
+          'Payment Mode': e.paymentMode,
+          Note: e.note || ''
+        }));
+        const wsExp = XLSX.utils.json_to_sheet(expRows);
+        XLSX.utils.book_append_sheet(wb, wsExp, "All_Expenses");
+      }
+
+      // 3. Investor Funding Sheet
+      if (pnlData.funding?.entries && pnlData.funding.entries.length > 0) {
+        const fundRows = pnlData.funding.entries.map((f: any, idx: number) => ({
+          '#': idx + 1,
+          Date: f.date,
+          Narration: f.narration,
+          'Amount (₹)': f.amount,
+          'Investor / Contributor': f.paidBy,
+          Mode: f.paymentMode
+        }));
+        const wsFund = XLSX.utils.json_to_sheet(fundRows);
+        XLSX.utils.book_append_sheet(wb, wsFund, "Investor_Capital");
+      }
+
+      XLSX.writeFile(wb, `PnL_Report_${pnlData.period?.month || 'Month'}_${pnlData.period?.year || '2026'}.xlsx`);
+    } catch (e) {
+      alert("Failed to export PnL Excel: " + e);
+    }
   };
 
   const exportInventoryExcel = () => {
@@ -1262,6 +1457,12 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('business-stats')}
           />
           <NavItem
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
+            label="P&L & Expenses"
+            active={activeTab === 'pnl'}
+            onClick={() => setActiveTab('pnl')}
+          />
+          <NavItem
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
             label="Branch Control"
             active={activeTab === 'shops'}
@@ -1304,6 +1505,8 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-4xl font-black tracking-tight text-text-primary">
               {activeTab === 'overview' && "Master Order Log"}
+              {activeTab === 'business-stats' && "Business Statistics"}
+              {activeTab === 'pnl' && "Profit & Loss (P&L) & Expenses"}
               {activeTab === 'shops' && "Branch Control"}
               {activeTab === 'rates' && "Rate List"}
               {activeTab === 'riders' && "Rider Fleet"}
@@ -1333,14 +1536,48 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <button 
-              className="glass px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-white/60 transition-all flex items-center gap-2" 
-              onClick={activeTab === 'inventory' ? exportInventoryExcel : exportToExcel}
-              title={activeTab === 'inventory' ? "Export Detailed Inventory Report (.xlsx)" : "Export Global Orders Report (.xlsx)"}
-            >
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              {activeTab === 'inventory' ? "Export Inventory Excel" : "Export Excel"}
-            </button>
+            {activeTab === 'pnl' ? (
+              <div className="flex items-center gap-3">
+                <button
+                  className="glass px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-white/60 transition-all flex items-center gap-2"
+                  onClick={exportPnlExcel}
+                  title="Download complete multi-sheet P&L report in Excel (.xlsx)"
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  Export P&L Excel
+                </button>
+                <button
+                  className="btn-primary shadow-xl shadow-primary/20 py-3 px-6 text-xs font-black"
+                  onClick={() => {
+                    setEditingExpenseId(null);
+                    setExpenseForm({
+                      date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+                      month: pnlData?.period?.month || 'Sep',
+                      year: pnlData?.period?.year || 2026,
+                      narration: '',
+                      amount: '',
+                      type: 'opex',
+                      subtype: 'office expense',
+                      paidBy: 'Sarvesh',
+                      paymentMode: 'online',
+                      note: ''
+                    });
+                    setShowExpenseModal(true);
+                  }}
+                >
+                  + Add Expense Entry
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="glass px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-white/60 transition-all flex items-center gap-2" 
+                onClick={activeTab === 'inventory' ? exportInventoryExcel : exportToExcel}
+                title={activeTab === 'inventory' ? "Export Detailed Inventory Report (.xlsx)" : "Export Global Orders Report (.xlsx)"}
+              >
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                {activeTab === 'inventory' ? "Export Inventory Excel" : "Export Excel"}
+              </button>
+            )}
             {activeTab === 'shops' && <button className="btn-primary shadow-xl shadow-primary/20" onClick={() => { setEditingStoreId(null); setStoreForm({ name: '', address: '', user: '', pass: '', mapUrl: '', branchCode: '' }); setShowStoreModal(true); }}>Add New Branch</button>}
             {activeTab === 'riders' && <button className="btn-primary shadow-xl shadow-primary/20" onClick={() => { setRiderForm({ name: '', username: '', password: '', phone: '', storeId: '' }); setShowRiderModal(true); }}>Add New Rider</button>}
             {activeTab === 'rates' && (
@@ -2060,9 +2297,646 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* P&L & Expenses Tab */}
+        {activeTab === 'pnl' && (
+          <div className="space-y-8">
+            {/* Filter & Control Bar */}
+            <div className="glass p-6 rounded-3xl flex flex-wrap justify-between items-center gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-2xl border border-black/5">
+                  <span className="text-[10px] font-black uppercase text-text-secondary">Month:</span>
+                  <select
+                    value={pnlMonth}
+                    onChange={(e) => {
+                      setPnlMonth(e.target.value);
+                      fetchPnl(e.target.value, pnlYear, activeStoreId);
+                    }}
+                    className="bg-transparent font-black text-sm outline-none cursor-pointer text-primary"
+                  >
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-2xl border border-black/5">
+                  <span className="text-[10px] font-black uppercase text-text-secondary">Year:</span>
+                  <select
+                    value={pnlYear}
+                    onChange={(e) => {
+                      setPnlYear(e.target.value);
+                      fetchPnl(pnlMonth, e.target.value, activeStoreId);
+                    }}
+                    className="bg-transparent font-black text-sm outline-none cursor-pointer text-primary"
+                  >
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-2xl border border-black/5">
+                  <span className="text-[10px] font-black uppercase text-text-secondary">Branch:</span>
+                  <select
+                    value={activeStoreId}
+                    onChange={(e) => {
+                      setActiveStoreId(e.target.value);
+                      fetchPnl(pnlMonth, pnlYear, e.target.value);
+                    }}
+                    className="bg-transparent font-black text-sm outline-none cursor-pointer"
+                  >
+                    <option value="all">All Branches</option>
+                    {stores.map(s => <option key={s.id} value={s.id}>{s.name} ({s.branchCode})</option>)}
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => fetchPnl(pnlMonth, pnlYear, activeStoreId)}
+                  className="p-3 bg-white/50 hover:bg-white rounded-2xl border border-black/5 text-primary font-black transition-all"
+                  title="Refresh P&L Data"
+                >
+                  🔄
+                </button>
+              </div>
+
+              {/* Sub-tab navigation pills */}
+              <div className="flex items-center gap-2 bg-black/5 p-1.5 rounded-2xl">
+                <button
+                  onClick={() => setPnlSubTab('summary')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${pnlSubTab === 'summary' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-secondary hover:text-black'}`}
+                >
+                  📊 Statement
+                </button>
+                <button
+                  onClick={() => setPnlSubTab('expenses')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${pnlSubTab === 'expenses' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-secondary hover:text-black'}`}
+                >
+                  🧾 Expenses ({pnlData?.expenses?.items?.length || 0})
+                </button>
+                <button
+                  onClick={() => setPnlSubTab('funding')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${pnlSubTab === 'funding' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-secondary hover:text-black'}`}
+                >
+                  💼 Investor Capital
+                </button>
+                <button
+                  onClick={() => setPnlSubTab('services')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${pnlSubTab === 'services' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-secondary hover:text-black'}`}
+                >
+                  🧺 Service Split
+                </button>
+              </div>
+            </div>
+
+            {pnlLoading && (
+              <div className="glass p-12 text-center rounded-3xl">
+                <div className="inline-block animate-spin text-3xl mb-3">🔄</div>
+                <p className="font-bold text-text-secondary">Crunching P&L statement from orders & expenses...</p>
+              </div>
+            )}
+
+            {!pnlLoading && pnlData && (
+              <>
+                {/* Top 5 Financial KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                  {/* Card 1: Net Revenue */}
+                  <div className="glass p-6 rounded-3xl border border-blue-500/10 hover:border-blue-500/30 transition-all">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 block mb-1">Net Revenue</span>
+                    <h3 className="text-3xl font-black text-text-primary">
+                      ₹{(pnlData.pnl?.netRevenue || 0).toLocaleString('en-IN')}
+                    </h3>
+                    <div className="mt-3 text-xs text-text-secondary space-y-1">
+                      <div className="flex justify-between font-medium">
+                        <span>Orders:</span>
+                        <span className="font-bold text-text-primary">{pnlData.revenue?.totalOrders || 0}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Gross:</span>
+                        <span>₹{(pnlData.revenue?.grossRevenue || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-emerald-600">
+                        <span>Collected:</span>
+                        <span className="font-bold">₹{(pnlData.revenue?.totalCollected || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      {pnlData.revenue?.pendingCollection > 0 && (
+                        <div className="flex justify-between font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">
+                          <span>Pending:</span>
+                          <span>₹{(pnlData.revenue?.pendingCollection || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Operating Expenses (OpEx) */}
+                  <div className="glass p-6 rounded-3xl border border-red-500/10 hover:border-red-500/30 transition-all">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-red-600 block mb-1">Monthly OpEx</span>
+                    <h3 className="text-3xl font-black text-red-600">
+                      ₹{(pnlData.expenses?.totalOpex || 0).toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-text-secondary mt-2">
+                      Packaging, chemicals, staff advances, office & petrol.
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-black/5 flex justify-between text-xs font-bold text-text-secondary">
+                      <span>Daily Burn:</span>
+                      <span>~₹{Math.round((pnlData.expenses?.totalOpex || 0) / 30).toLocaleString('en-IN')}/day</span>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Operating Profit / Loss */}
+                  <div className={`glass p-6 rounded-3xl border transition-all ${
+                    (pnlData.pnl?.operatingProfitLoss || 0) >= 0 
+                      ? 'border-emerald-500/20 bg-emerald-500/5' 
+                      : 'border-red-500/20 bg-red-500/5'
+                  }`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${
+                      (pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                    }`}>
+                      Operational P&L
+                    </span>
+                    <h3 className={`text-3xl font-black ${
+                      (pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                    }`}>
+                      {(pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? '+' : ''}
+                      ₹{(pnlData.pnl?.operatingProfitLoss || 0).toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-text-secondary mt-2">
+                      Net Revenue − Operating Expenses (excl. setup capex)
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-black/5 text-[10px] font-bold text-text-secondary uppercase">
+                      {(pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? '✅ Profitable' : '⚠️ Growth Phase'}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Capital Expenditure (CapEx) */}
+                  <div className="glass p-6 rounded-3xl border border-purple-500/10 hover:border-purple-500/30 transition-all">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-600 block mb-1">One-Time CapEx</span>
+                    <h3 className="text-3xl font-black text-purple-600">
+                      ₹{(pnlData.expenses?.totalCapex || 0).toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-text-secondary mt-2">
+                      Machinery, CCTV, electric bike, shed & setup assets.
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-black/5 text-[10px] font-black text-purple-700 uppercase">
+                      Asset Investment (Non-recurring)
+                    </div>
+                  </div>
+
+                  {/* Card 5: Investor Funding & Cash Flow */}
+                  <div className="glass p-6 rounded-3xl border border-emerald-500/10 hover:border-emerald-500/30 transition-all">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">Investor Funding</span>
+                    <h3 className="text-3xl font-black text-emerald-600">
+                      ₹{(pnlData.funding?.totalFunding || 0).toLocaleString('en-IN')}
+                    </h3>
+                    <div className="mt-3 text-xs text-text-secondary space-y-1">
+                      <div className="flex justify-between font-medium">
+                        <span>Net Cash Flow:</span>
+                        <span className={`font-bold ${(pnlData.pnl?.netCashFlow || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ₹{(pnlData.pnl?.netCashFlow || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Cash In Hand:</span>
+                        <span className="font-bold text-text-primary">
+                          ₹{((pnlData.revenue?.totalCollected || 0) + (pnlData.funding?.totalFunding || 0) - (pnlData.expenses?.totalExpenses || 0)).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Break-Even Progress Banner */}
+                <div className="glass p-6 rounded-3xl border border-primary/10 flex flex-wrap items-center justify-between gap-6 bg-gradient-to-r from-primary/5 to-transparent">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-black">
+                      🎯
+                    </div>
+                    <div>
+                      <h4 className="font-black text-base text-text-primary">Break-Even & Growth Diagnostic</h4>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        Avg Order Value (AOV): <strong className="text-text-primary">₹{pnlData.pnl?.averageOrderValue || 217}</strong> • 
+                        Target Orders for Break-Even: <strong className="text-primary">{pnlData.pnl?.breakEvenOrders || 0} orders/month</strong> • 
+                        Current Orders: <strong className="text-emerald-600">{pnlData.pnl?.currentRunRate || 0}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Gap to Break-Even</span>
+                      <span className="font-black text-lg text-primary">{pnlData.pnl?.gapToBreakEven || 0} orders needed</span>
+                    </div>
+                    <div className="w-32 bg-black/10 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className="bg-primary h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.round(((pnlData.pnl?.currentRunRate || 0) / (pnlData.pnl?.breakEvenOrders || 1)) * 100))}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-Tab 1: P&L Statement */}
+                {pnlSubTab === 'summary' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Revenue Statement */}
+                    <div className="glass p-8 rounded-3xl space-y-6">
+                      <div className="flex justify-between items-center border-b border-black/5 pb-4">
+                        <div>
+                          <h4 className="text-xl font-black text-text-primary">Revenue Statement</h4>
+                          <span className="text-xs text-text-secondary font-medium">Orders recorded in system</span>
+                        </div>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-black">
+                          {pnlData.revenue?.totalOrders || 0} Orders
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-black/5 text-sm">
+                          <span className="text-text-secondary font-medium">Gross Booked Revenue</span>
+                          <span className="font-bold">₹{(pnlData.revenue?.grossRevenue || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-black/5 text-sm text-red-500">
+                          <span className="font-medium">Less: Customer Discounts</span>
+                          <span className="font-bold">−₹{(pnlData.revenue?.totalDiscounts || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between py-3 border-b-2 border-black/10 text-base font-black text-primary">
+                          <span>Net Revenue</span>
+                          <span>₹{(pnlData.revenue?.netRevenue || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between py-2 text-sm text-emerald-600 font-bold">
+                          <span>↳ Online QR / UPI Collected</span>
+                          <span>₹{(pnlData.revenue?.onlineCollected || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between py-2 text-sm text-emerald-600 font-bold">
+                          <span>↳ Cash Collected</span>
+                          <span>₹{(pnlData.revenue?.cashCollected || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between py-2 text-sm text-amber-600 font-bold bg-amber-50 px-3 rounded-xl">
+                          <span>⚠️ Pending Receivables</span>
+                          <span>₹{(pnlData.revenue?.pendingCollection || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Operating Expenses Breakdown */}
+                    <div className="glass p-8 rounded-3xl space-y-6">
+                      <div className="flex justify-between items-center border-b border-black/5 pb-4">
+                        <div>
+                          <h4 className="text-xl font-black text-text-primary">Operating Expenses (OpEx)</h4>
+                          <span className="text-xs text-text-secondary font-medium">Monthly recurring cost center</span>
+                        </div>
+                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-black">
+                          Total: ₹{(pnlData.expenses?.totalOpex || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {Object.entries(pnlData.expenses?.opexBreakdown || {}).map(([cat, amt]: any) => (
+                          <div key={cat} className="flex justify-between items-center py-2 border-b border-black/5 text-sm">
+                            <span className="text-text-primary font-bold capitalize">
+                              {cat}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-text-secondary">
+                                {Math.round((amt / (pnlData.expenses?.totalOpex || 1)) * 100)}%
+                              </span>
+                              <span className="font-bold text-red-600">₹{amt.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="flex justify-between py-3 border-t-2 border-black/10 text-base font-black text-red-600">
+                          <span>Total Operating Expenses</span>
+                          <span>₹{(pnlData.expenses?.totalOpex || 0).toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <div className={`p-4 rounded-2xl flex justify-between items-center font-black ${
+                          (pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                        }`}>
+                          <span>NET OPERATING RESULT</span>
+                          <span className="text-lg">
+                            {(pnlData.pnl?.operatingProfitLoss || 0) >= 0 ? '+' : ''}
+                            ₹{(pnlData.pnl?.operatingProfitLoss || 0).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Tab 2: Expenses Log */}
+                {pnlSubTab === 'expenses' && (
+                  <div className="glass p-8 rounded-3xl space-y-6">
+                    <div className="flex justify-between items-center flex-wrap gap-4">
+                      <div>
+                        <h4 className="text-2xl font-black text-text-primary">Expenses Log</h4>
+                        <span className="text-xs text-text-secondary font-medium">Detailed audit trail of all payments and expenses</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="text"
+                          placeholder="Search narration, category, paid by..."
+                          value={expenseSearch}
+                          onChange={(e) => setExpenseSearch(e.target.value)}
+                          className="bg-white/50 border border-black/5 rounded-2xl px-4 py-2 text-xs font-bold outline-none w-64"
+                        />
+                        <select
+                          value={expenseTypeFilter}
+                          onChange={(e) => setExpenseTypeFilter(e.target.value)}
+                          className="bg-white/50 border border-black/5 rounded-2xl px-4 py-2 text-xs font-bold outline-none"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="opex">OpEx Only</option>
+                          <option value="capex">CapEx Only</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-black/10 text-[10px] font-black uppercase text-text-secondary tracking-wider">
+                            <th className="py-3 px-4">Date</th>
+                            <th className="py-3 px-4">Narration</th>
+                            <th className="py-3 px-4">Category</th>
+                            <th className="py-3 px-4">Type</th>
+                            <th className="py-3 px-4">Amount</th>
+                            <th className="py-3 px-4">Paid By</th>
+                            <th className="py-3 px-4">Mode</th>
+                            <th className="py-3 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-black/5">
+                          {(pnlData.expenses?.items || [])
+                            .filter((item: any) => {
+                              if (expenseTypeFilter !== 'all' && item.type !== expenseTypeFilter) return false;
+                              if (!expenseSearch) return true;
+                              const q = expenseSearch.toLowerCase();
+                              return (
+                                String(item.narration || '').toLowerCase().includes(q) ||
+                                String(item.subtype || '').toLowerCase().includes(q) ||
+                                String(item.paidBy || '').toLowerCase().includes(q) ||
+                                String(item.date || '').toLowerCase().includes(q)
+                              );
+                            })
+                            .map((exp: any, i: number) => (
+                              <tr key={exp._id || i} className="hover:bg-white/40 transition-colors">
+                                <td className="py-3 px-4 font-mono text-xs">{exp.date}</td>
+                                <td className="py-3 px-4 font-bold text-text-primary">{exp.narration}</td>
+                                <td className="py-3 px-4">
+                                  <span className="px-2.5 py-1 bg-black/5 rounded-full text-[11px] font-bold capitalize">
+                                    {exp.subtype}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    exp.type === 'capex' 
+                                      ? 'bg-purple-100 text-purple-700' 
+                                      : exp.type === 'funding'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {exp.type}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 font-black text-text-primary">
+                                  ₹{Number(exp.amount || 0).toLocaleString('en-IN')}
+                                </td>
+                                <td className="py-3 px-4 text-text-secondary text-xs">{exp.paidBy || 'Sarvesh'}</td>
+                                <td className="py-3 px-4">
+                                  <span className="capitalize text-xs font-medium text-text-secondary">
+                                    {exp.paymentMode || 'online'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    onClick={() => handleDeleteExpense(exp._id)}
+                                    className="p-1.5 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                                    title="Delete Expense"
+                                  >
+                                    🗑️
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Tab 3: Investor Capital */}
+                {pnlSubTab === 'funding' && (
+                  <div className="glass p-8 rounded-3xl space-y-6">
+                    <div className="flex justify-between items-center border-b border-black/5 pb-4">
+                      <div>
+                        <h4 className="text-2xl font-black text-text-primary">Investor Capital & Funding Log</h4>
+                        <span className="text-xs text-text-secondary font-medium">
+                          Equity / Capital infusions from investors (not operational revenue)
+                        </span>
+                      </div>
+                      <span className="px-4 py-2 bg-emerald-100 text-emerald-800 rounded-2xl text-sm font-black">
+                        Total Invested: ₹{(pnlData.funding?.totalFunding || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-black/10 text-[10px] font-black uppercase text-text-secondary tracking-wider">
+                            <th className="py-3 px-4">Date</th>
+                            <th className="py-3 px-4">Narration</th>
+                            <th className="py-3 px-4">Investor / Contributor</th>
+                            <th className="py-3 px-4">Mode</th>
+                            <th className="py-3 px-4 text-right">Amount (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-black/5">
+                          {(pnlData.funding?.entries || []).map((f: any, i: number) => (
+                            <tr key={i} className="hover:bg-white/40">
+                              <td className="py-3 px-4 font-mono text-xs">{f.date}</td>
+                              <td className="py-3 px-4 font-bold text-text-primary">{f.narration}</td>
+                              <td className="py-3 px-4 font-bold text-emerald-700">{f.paidBy}</td>
+                              <td className="py-3 px-4 capitalize text-xs text-text-secondary">{f.paymentMode || 'Online'}</td>
+                              <td className="py-3 px-4 font-black text-emerald-600 text-right">
+                                ₹{Number(f.amount || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Tab 4: Service Split */}
+                {pnlSubTab === 'services' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="glass p-8 rounded-3xl space-y-6">
+                      <h4 className="text-xl font-black text-text-primary">Revenue by Laundry Service</h4>
+                      <div className="space-y-3">
+                        {Object.entries(pnlData.revenue?.serviceBreakdown || {}).map(([service, val]: any) => (
+                          <div key={service} className="flex justify-between items-center py-2 border-b border-black/5 text-sm">
+                            <div>
+                              <span className="font-bold text-text-primary block">{service}</span>
+                              <span className="text-xs text-text-secondary">{val.count} orders</span>
+                            </div>
+                            <span className="font-black text-primary">₹{Number(val.revenue || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="glass p-8 rounded-3xl space-y-6">
+                      <h4 className="text-xl font-black text-text-primary">Daily Order Trends</h4>
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                        {Object.entries(pnlData.revenue?.dailyBreakdown || {}).map(([day, val]: any) => (
+                          <div key={day} className="flex justify-between items-center py-2 border-b border-black/5 text-sm">
+                            <span className="font-mono text-xs font-bold">{day}</span>
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs text-text-secondary">{val.orders} orders</span>
+                              <span className="font-bold text-text-primary">₹{Number(val.revenue || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </main>
 
-      {/* Rider Modal */}
+      {/* Add / Edit Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[100] flex items-center justify-center p-6 overflow-y-auto">
+          <div className="glass-card w-full max-w-lg p-8 shadow-2xl my-auto">
+            <h3 className="text-2xl font-black mb-6 text-primary">
+              {editingExpenseId ? 'Edit Expense Entry' : 'Log New Expense Entry'}
+            </h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Date (DD-MM-YYYY)</label>
+                  <input
+                    type="text"
+                    value={expenseForm.date}
+                    onChange={e => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3"
+                    placeholder="15-09-2026"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Expense Type</label>
+                  <select
+                    value={expenseForm.type}
+                    onChange={e => setExpenseForm({ ...expenseForm, type: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3"
+                  >
+                    <option value="opex">OpEx (Monthly Recurring)</option>
+                    <option value="capex">CapEx (One-Time Setup)</option>
+                    <option value="funding">Investor Funding</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="text-[10px] font-black uppercase text-text-secondary">Narration / Description</label>
+                <input
+                  type="text"
+                  value={expenseForm.narration}
+                  onChange={e => setExpenseForm({ ...expenseForm, narration: e.target.value })}
+                  className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3"
+                  placeholder="e.g. Detergent Liquid 50L / Staff Tea / Electricity"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={expenseForm.amount}
+                    onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3 font-bold text-lg"
+                    placeholder="2500"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Category / Subtype</label>
+                  <select
+                    value={expenseForm.subtype}
+                    onChange={e => setExpenseForm({ ...expenseForm, subtype: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3 capitalize"
+                  >
+                    <option value="chemical">Chemicals & Detergent</option>
+                    <option value="packaging">Packaging Material</option>
+                    <option value="office expense">Office Expense</option>
+                    <option value="advance salary">Staff Advance / Salary</option>
+                    <option value="marketing">Marketing & Pamphlets</option>
+                    <option value="repairs">Repairs & Plumbing</option>
+                    <option value="travel">Travel & Petrol</option>
+                    <option value="asset">Machinery & Asset (CapEx)</option>
+                    <option value="infra">Infrastructure & Shed (CapEx)</option>
+                    <option value="capital">Investor Capital (Funding)</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Paid By / Payer</label>
+                  <input
+                    type="text"
+                    value={expenseForm.paidBy}
+                    onChange={e => setExpenseForm({ ...expenseForm, paidBy: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3"
+                    placeholder="Sarvesh"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-[10px] font-black uppercase text-text-secondary">Payment Mode</label>
+                  <select
+                    value={expenseForm.paymentMode}
+                    onChange={e => setExpenseForm({ ...expenseForm, paymentMode: e.target.value })}
+                    className="w-full bg-white/50 border border-black/5 rounded-xl px-4 py-3"
+                  >
+                    <option value="online">Online / UPI / QR</option>
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank Transfer</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                className="btn-primary flex-1 py-4 font-black"
+                onClick={handleSaveExpense}
+              >
+                Save Expense Entry
+              </button>
+              <button
+                className="px-6 py-4 font-bold text-text-secondary hover:text-black"
+                onClick={() => setShowExpenseModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showRiderModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md p-8 shadow-2xl">

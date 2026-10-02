@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17877718922"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-17877718922');
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store Locator | Find Laundry Basket dry cleaners in Bhopal</title>
+  <meta name="description" content="Find the nearest Laundry Basket dry cleaning and laundry shop in Bhopal. View addresses, ratings, get directions, or call us for doorstep pickup.">
+  <meta name="keywords" content="laundry shop bhopal, dry cleaner store bhopal, laundry branch bhopal, find dry cleaning bhopal">
+  <link rel="canonical" href="https://www.laundrybasketunicorn.com/Pages/store-locator.html">
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link rel="icon" type="image/png" href="../images/logo.png">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/store-locator.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script defer src="../assets/js/scripts.js"></script>
+</head>
+
+<body>
+  <div id="site-header"></div>
+
+  <main class="container">
+    <section class="locator-section">
+      <div class="locator-header">
+        <h1 class="locator-title">Find our <span>Bhopal store</span> near you</h1>
+        <p class="locator-desc">
+          Find Laundry Basket laundry and dry clean shop nearby you and experience our world class dry cleaning,
+          laundry,
+          curtain cleaning, shoe cleaning, carpet cleaning services and much more.
+        </p>
+      </div>
+
+
+
+      
+
+      <!-- Flagship Storefront Showcase -->
+      <div class="store-showcase-wrapper">
+        <div class="store-showcase-card">
+          <div class="store-showcase-img-wrap">
+            <img 
+              src="../images/laundry_service_thumbnail_first_frame_clean.png" 
+              alt="Laundry Basket Storefront Bhopal - Premium Dry Cleaning & Steam Iron" 
+              class="store-showcase-img"
+            >
+            <div class="store-showcase-badge">
+              <span class="live-dot"></span> Flagship Stores &amp; Experience Hubs in Bhopal
+            </div>
+          </div>
+          <div class="store-showcase-info">
+            <div class="showcase-item">
+              <i class="fas fa-tshirt"></i>
+              <div>
+                <strong>Commercial Grade Care</strong>
+                <span>Imported Italian Dry Cleaning &amp; Washing machines</span>
+              </div>
+            </div>
+            <div class="showcase-item">
+              <i class="fas fa-truck-fast"></i>
+              <div>
+                <strong>Doorstep Pickup &amp; Delivery</strong>
+                <span>Free home pickup across all major Bhopal localities</span>
+              </div>
+            </div>
+            <div class="showcase-item">
+              <i class="fas fa-certificate"></i>
+              <div>
+                <strong>Eco-Friendly Solvents</strong>
+                <span>Fabric-safe, non-toxic &amp; hygienic processing</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="store-grid" id="public-store-grid">
+        <!-- Dynamically loaded from localStorage -->
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script>
+    async function renderPublicStores() {
+        const grid = document.getElementById('public-store-grid');
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--muted);">Searching for stores...</p>';
+
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5000/api' : '/api';
+
+        try {
+            const res = await fetch(`${API_BASE}/public/stores`);
+            const stores = await res.json();
+
+            if (!stores || stores.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--muted);">No stores found. Check back soon!</p>';
+                return;
+            }
+
+            const selectedStoreId = localStorage.getItem('laundry_selected_store_id');
+            grid.innerHTML = stores.map(store => {
+                const isSelected = selectedStoreId === store.id;
+                return `
+                <div class="store-card">
+                    <h3>Laundry Basket — ${store.name}</h3>
+                    ${store.address === 'Opening Soon' || !store.address 
+                        ? '<div class="opening-soon-badge">Opening Soon</div>' 
+                        : `<p class="store-address">${store.address}</p>`
+                    }
+                    
+                    ${(store.address && store.address !== 'Opening Soon') ? `
+                        <div class="rating-section">
+                            <div class="google-logo">
+                                <svg viewBox="0 0 48 48" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z" fill="#4285F4"/><path d="M6.3 14.7l6.6 4.8C14.7 15.1 18.9 12 24 12c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16.3 2 9.7 6.3 6.3 14.7z" fill="#EA4335"/><path d="M24 46c7.7 0 14.4-4.4 17.7-11.3l-6.2-5.2C33.9 32.5 29.4 35 24 35c-5.1 0-9.4-3.1-11.1-7.5l-6.6 5.1C9.6 39.7 16.2 46 24 46z" fill="#34A853"/><path d="M4.6 29.4l6.6-5.1C11.2 24.3 11 24.2 11 24s.2-.3.3-.4l-6.6-5.1C3.8 20.4 3.5 22.2 3.5 24s.3 3.6 1.1 5.4z" fill="#FBBC05"/></svg>
+                                <span class="google-rating-label">Google Rating</span>
+                            </div>
+                            <div class="rating-value">4.8</div>
+                            <div class="rating-stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div class="store-actions">
+                        ${(store.address && store.address !== 'Opening Soon') ? `
+                            <a href="${store.mapUrl || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(store.address)}`}" class="action-btn" target="_blank">Get Directions</a>
+                            <button onclick="setSelectedStore('${store.id}')" id="btn-select-${store.id}" class="action-btn select-store-btn" style="${isSelected ? 'background: #22c55e; color: white; border: none; cursor: pointer;' : 'background: var(--primary); color: white; border: none; cursor: pointer;'}">
+                                ${isSelected ? '✓ My Branch' : 'Select Branch'}
+                            </button>
+                        ` : ''}
+                        <a href="tel:+919644254425" class="action-btn">Call Now</a>
+                    </div>
+                </div>
+            `}).join('');
+        } catch (err) {
+            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error);">Failed to load stores. Please check your connection.</p>';
+        }
+    }
+
+    window.setSelectedStore = function(id) {
+        localStorage.setItem('laundry_selected_store_id', id);
+        document.querySelectorAll('.select-store-btn').forEach(btn => {
+            if (btn.id === `btn-select-${id}`) {
+                btn.style.background = '#22c55e';
+                btn.style.color = 'white';
+                btn.innerText = '✓ My Branch';
+            } else {
+                btn.style.background = 'var(--primary)';
+                btn.style.color = 'white';
+                btn.innerText = 'Select Branch';
+            }
+        });
+        if (window.initGoogleAnalytics) {
+            window.initGoogleAnalytics(id);
+        }
+        alert('Active branch set successfully!');
+    };
+
+    window.addEventListener('DOMContentLoaded', renderPublicStores);
+  </script>
+</body>
+
+</html>

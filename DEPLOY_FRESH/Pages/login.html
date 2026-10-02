@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17877718922"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-17877718922');
+  </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management & Store Partner Login Bhopal | Laundry Basket</title>
+    <meta name="description" content="Secure portal login for Laundry Basket Bhopal store managers, administrators, and riders. Manage orders, branch inventory, and customer pickups.">
+    <meta name="keywords" content="laundry basket login, store manager portal bhopal, admin login laundry basket, dry cleaning management bhopal">
+    <link rel="canonical" href="https://www.laundrybasketunicorn.com/Pages/login.html">
+    <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+    <link rel="icon" type="image/png" href="../images/logo.png">
+    <link rel="stylesheet" href="../assets/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: #0f172a;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .login-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(circle at top right, #1e3a8a, transparent),
+                        radial-gradient(circle at bottom left, #1e40af, transparent);
+            filter: blur(80px);
+            opacity: 0.5;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 48px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo-box {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--brand), #3b82f6);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+            margin: 0 auto 32px;
+            box-shadow: 0 10px 25px rgba(26, 111, 219, 0.3);
+        }
+
+        h2 {
+            color: white;
+            font-weight: 800;
+            font-size: 1.75rem;
+            margin-bottom: 8px;
+        }
+
+        p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin-bottom: 40px;
+        }
+
+        .form-group {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            color: #e2e8f0;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            margin-left: 4px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 16px 16px 16px 50px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .login-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--brand);
+            box-shadow: 0 0 0 4px rgba(26, 111, 219, 0.15);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 18px;
+            background: var(--brand);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .login-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(26, 111, 219, 0.2);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .error-msg {
+            color: #f87171;
+            font-size: 0.85rem;
+            margin-top: 20px;
+            display: none;
+            background: rgba(248, 113, 113, 0.1);
+            padding: 12px;
+            border-radius: 12px;
+        }
+
+        .back-home {
+            display: inline-block;
+            margin-top: 32px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.3s ease;
+        }
+
+        .back-home:hover {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-bg"></div>
+    
+    <div class="login-card">
+        <div class="logo-box">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+        <h2>Portal Access</h2>
+        <p>Enter your credentials to continue to management.</p>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="username" class="login-input" placeholder="e.g. admin_master" required autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" class="login-input" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+            </div>
+
+            <button type="submit" class="login-btn">
+                <span>Secure Sign In</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+
+            <div id="error-message" class="error-msg">Invalid username or password.</div>
+        </form>
+
+        <a href="../index.html" class="back-home"><i class="fas fa-arrow-left" style="margin-right: 8px;"></i> Back to Website</a>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const errorEl = document.getElementById('error-message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    localStorage.setItem('lb_auth_token', data.token);
+                    localStorage.setItem('lb_user_role', data.role);
+                    localStorage.setItem('lb_user_name', data.name);
+                    if (data.storeId) localStorage.setItem('lb_store_id', data.storeId);
+
+                    // Redirect based on role
+                    if (data.role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'store-manager.html';
+                    }
+                } else {
+                    errorEl.innerText = data.error || 'Login failed';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.innerText = 'Server error. Please try again.';
+                errorEl.style.display = 'block';
+            }
+        });
+
+        // Auto-redirect disabled to allow testing login window
+    </script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laundry Basket — Professional Laundry & Dry Cleaning Services</title>
+  <meta name="description"
+    content="Get professional laundry, dry cleaning, and steam ironing services at your doorstep with Laundry Basket. Fast pickup in 60 minutes and reliable delivery.">
+  <meta name="keywords"
+    content="best laundry service, professional dry cleaning, steam iron near me, shoe cleaning services, doorstep laundry pickup, wash and iron service, Laundry Basket India, affordable dry cleaning, eco-friendly laundry">
+  <meta name="author" content="Laundry Basket">
+  <link rel="canonical" href="https://www.laundrybasketunicorn.com/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.laundrybasketunicorn.com/">
+  <meta property="og:title" content="Laundry Basket — Professional Laundry & Dry Cleaning Services">
+  <meta property="og:description"
+    content="Professional laundry and garment care at your doorstep. Fast Same Day pickup and hygienic cleaning.">
+  <meta property="og:image" content="https://www.laundrybasketunicorn.com/images/og-image.jpg">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://www.laundrybasketunicorn.com/">
+  <meta property="twitter:title" content="Laundry Basket — Professional Laundry & Dry Cleaning Services">
+  <meta property="twitter:description"
+    content="Professional laundry and garment care at your doorstep. Fast 60-minute pickup and hygienic cleaning.">
+  <meta property="twitter:image" content="https://www.laundrybasketunicorn.com/images/og-image.jpg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script defer src="assets/js/scripts.js"></script>
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Laundry Basket",
+    "image": "https://www.laundrybasketunicorn.com/images/logo.png",
+    "@id": "https://www.laundrybasketunicorn.com/",
+    "url": "https://www.laundrybasketunicorn.com/",
+    "telephone": "+919644254425",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Various Locations",
+      "addressLocality": "Bangalore",
+      "addressRegion": "KA",
+      "postalCode": "560001",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 12.9716,
+      "longitude": 77.5946
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "opens": "09:00",
+      "closes": "21:00"
+    },
+    "sameAs": [
+      "https://www.facebook.com/laundrybasket",
+      "https://www.instagram.com/laundrybasket"
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <div id="site-header"></div>
+  <div class="container">
+
+    <section class="hero">
+      <div class="hero-slideshow" aria-hidden="true">
+        <img class="slide" src="images/1bg.jpg" alt="Professional laundry and dry cleaning services background">
+        <img class="slide" src="images/2bg.jpg" alt="Doorstep laundry pickup and delivery service background">
+      </div>
+      <div class="hero-inner container">
+        <div class="hero-copy">
+          <span class="hero-label">Intro offer — 20% OFF</span>
+          <h1 class="hero-title">Doorstep pickup <span>Same Day</span></h1>
+          <p class="hero-text">Book a pickup slot from the app and we’ll be at your door — no calls needed. Enjoy fast,
+            hygienic laundry service with transparent pricing and reliable delivery.</p>
+
+          <div class="hero-features">
+            <a href="Pages/booking.html" style="text-decoration: none;"><span><i class="fas fa-calendar-check"></i> Same Day
+                Pickup</span></a>
+            <span><i class="fas fa-map-marker-alt"></i> Track every order</span>
+            <span><i class="fas fa-hand-holding-heart"></i> Contactless delivery</span>
+          </div>
+          <div class="hero-actions hero-badges">
+            <a href="https://apps.apple.com/app/laundry-basket" class="badge-link" target="_blank"
+              rel="noopener noreferrer">
+              <span class="badge-icon"><i class="fab fa-apple"></i></span>
+              <div class="badge-text">
+                <small>Download on the</small>
+                <strong>App Store</strong>
+              </div>
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.laundrybasket" class="badge-link" target="_blank"
+              rel="noopener noreferrer">
+              <span class="badge-icon"><i class="fab fa-google-play"></i></span>
+              <div class="badge-text">
+                <small>GET IT ON</small>
+                <strong>Google Play</strong>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Tracking Center (Right Side) -->
+        <div class="hero-tracking-display">
+          <div class="tracking-center-wrapper">
+            <!-- Order Tracking Input -->
+            <div class="tracking-hero">
+              <div class="tracking-container">
+                <input type="text" id="track-order-id" placeholder="Enter Order ID (e.g. INDRAPURI-1001)" aria-label="Track Order">
+                <button onclick="trackOrder()">Track Now</button>
+              </div>
+            </div>
+
+            <!-- Tracking Status Card -->
+            <div id="tracking-status-display" class="tracking-status-card" style="display: none;">
+              <div class="tracking-card-header">
+                <span id="status-main-label" class="status-main-text">Order Processing</span>
+                <i class="fas fa-history status-icon"></i>
+              </div>
+              <div id="tracking-items-list" class="tracking-items">
+                <!-- Items injected here -->
+              </div>
+              <div id="live-tracking-map" style="height: 200px; margin: 15px; border-radius: 20px; overflow: hidden; border: 2px solid rgba(26, 111, 219, 0.1); display: none;"></div>
+              <div class="tracking-divider"></div>
+              <div class="tracking-card-footer">
+                <span class="total-label">Total Amount</span>
+                <span id="status-total-value" class="total-value">₹0</span>
+              </div>
+              <button class="status-card-close" onclick="closeTracking()"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="section section-alt">
+      <div class="section-header">
+        <h2 class="section-title">Our Premium <span>Services</span></h2>
+        <p class="section-text">Professional laundry and garment care at your doorstep. Choose services, schedule
+          pickups, and track every order in one modern app.</p>
+      </div>
+      <div class="card-grid small-tiles">
+        <a href="Pages/services.html#dry-clean" class="service-tile">
+          <i class="fas fa-user-tie" style="color: #3b82f6;"></i>
+          <span>Dry Cleaning</span>
+        </a>
+        <a href="Pages/services.html#wash-iron" class="service-tile">
+          <i class="fas fa-tshirt" style="color: #10b981;"></i>
+          <span>Wash & Iron</span>
+        </a>
+        <a href="Pages/services.html#steam-iron" class="service-tile">
+          <i class="fas fa-hot-tub" style="color: #ef4444;"></i>
+          <span>Steam Iron</span>
+        </a>
+        <a href="Pages/services.html#iron" class="service-tile">
+          <i class="fas fa-shirt" style="color: #3b82f6;"></i>
+          <span>Iron</span>
+        </a>
+        <a href="Pages/services.html#shoe-clean" class="service-tile">
+          <i class="fas fa-shoe-prints" style="color: #8b5cf6;"></i>
+          <span>Shoe Cleaning</span>
+        </a>
+        <a href="Pages/services.html#dry-clean" class="service-tile">
+          <i class="fas fa-bed" style="color: #3b82f6;"></i>
+          <span>Household Items</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <span class="section-subtitle">Why choose us</span>
+        <h2 class="section-title">Expert care for every fabric</h2>
+        <p class="section-text">Our team handles every order with hygiene, reliability, and care. From daily wear to
+          delicate pieces, we keep your clothes fresh and lasting longer.</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span id="stat-orders" class="stat-value">10,000+</span>
+          <span class="stat-label">Orders completed</span>
+        </div>
+        <div class="stat-card">
+          <span id="stat-customers" class="stat-value">500+</span>
+          <span class="stat-label">Happy customers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">99%</span>
+          <span class="stat-label">Satisfaction rating</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">8+</span>
+          <span class="stat-label">Service categories</span>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div id="site-footer"></div>
+</body>
+
+</html>
