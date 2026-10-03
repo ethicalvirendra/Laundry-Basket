@@ -1612,7 +1612,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <StatCard label="Global Revenue" value={`₹${stats.totalRevenue.toLocaleString()}`} growth="+12%" color="blue" />
               <StatCard label="Total Orders" value={stats.totalOrders.toString()} growth="-14%" color="gray" />
-              <StatCard label="Active Pickups" value={stats.activeOrders.toString()} growth="+2" color="blue" />
+              <StatCard label="Pending Delivery" value={stats.activeOrders.toString()} growth="+2" color="blue" />
             </div>
 
             <EarningGraph data={dailyEarningsData} />
