@@ -341,6 +341,8 @@ export default function ManagerPanel() {
   const [loading, setLoading] = useState(true);
   const [showWalkinModal, setShowWalkinModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showWaModal, setShowWaModal] = useState(false);
+  const [waModalOrder, setWaModalOrder] = useState<any>(null);
   const [showEODModal, setShowEODModal] = useState(false);
   const [isExportingEODPdf, setIsExportingEODPdf] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -1616,6 +1618,11 @@ export default function ManagerPanel() {
     }
   };
 
+  const openWhatsAppOptions = (order: any) => {
+    setWaModalOrder(order);
+    setShowWaModal(true);
+  };
+
   const shareOnWhatsapp = (order: any) => {
     const servicesList = Array.isArray(order.services)
       ? order.services.map((s: string) => `  • ${s}`).join('%0A')
@@ -1637,6 +1644,41 @@ export default function ManagerPanel() {
       `━━━━━━━━━━━━━━━━━━━━%0A` +
       `🔍 Track Order: https://www.laundrybasketunicorn.com/?track=${order.id}%0A%0A` +
       `_Thank you for choosing Laundry Basket! 🙏_`;
+    window.open(`https://wa.me/91${order.phone}?text=${message}`, '_blank');
+  };
+
+  const shareReceivedConfirmation = (order: any) => {
+    const serviceName = Array.isArray(order.services)
+      ? order.services.join(', ')
+      : (order.services || 'Laundry Service');
+
+    const pickupDate = order.pickupDate || order.pickup_date || order.date || (order.timestamp ? String(order.timestamp).split(',')[0].trim() : new Date().toLocaleDateString('en-IN'));
+    const expectedDelivery = order.deliveryDate || order.expected_delivery || 'Within 48-72 hrs';
+
+    const message = encodeURIComponent(
+`📦 *Laundry Basket – Order Confirmation*
+
+Dear *${order.name || 'Valued Customer'}*,
+
+Thank you for choosing *Laundry Basket*! 😊
+
+Your order has been received successfully.
+
+🆔 *Order ID:* ${order.id}
+🧺 *Service:* ${serviceName}
+📅 *Pickup Date:* ${pickupDate}
+🚚 *Expected Delivery:* ${expectedDelivery}
+✅ *Order Status:* Order Received
+
+Our team has started processing your order. You'll receive updates as your order moves through each stage.
+
+🔍 *Track Your Order:* https://www.laundrybasketunicorn.com/?track=${order.id}
+
+Thank you for trusting *Laundry Basket*. ❤️
+
+*Team Laundry Basket* 🧺`
+    );
+
     window.open(`https://wa.me/91${order.phone}?text=${message}`, '_blank');
   };
 
@@ -2350,7 +2392,7 @@ export default function ManagerPanel() {
                     onView={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
                     onPrint={() => printThermal(o)}
                     onPdf={() => downloadPDF(o)}
-                    onWhatsApp={() => shareOnWhatsapp(o)}
+                    onWhatsApp={() => openWhatsAppOptions(o)}
                     onEdit={() => handleStartEditOrder(o)}
                   />
                 ))}
@@ -2388,7 +2430,7 @@ export default function ManagerPanel() {
                     onView={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
                     onPrint={() => printThermal(o)}
                     onPdf={() => downloadPDF(o)}
-                    onWhatsApp={() => shareOnWhatsapp(o)}
+                    onWhatsApp={() => openWhatsAppOptions(o)}
                     onEdit={() => handleStartEditOrder(o)}
                   />
                 ))}
@@ -2426,7 +2468,7 @@ export default function ManagerPanel() {
                     onView={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
                     onPrint={() => printThermal(o)}
                     onPdf={() => downloadPDF(o)}
-                    onWhatsApp={() => shareOnWhatsapp(o)}
+                    onWhatsApp={() => openWhatsAppOptions(o)}
                     onEdit={() => handleStartEditOrder(o)}
                   />
                 ))}
@@ -4756,7 +4798,7 @@ export default function ManagerPanel() {
                   </button>
                   <button
                     className="glass flex items-center justify-center gap-1 font-black text-[10px] py-3 px-1 hover:bg-green-50 text-green-600 transition-all"
-                    onClick={() => shareOnWhatsapp(selectedOrder)}
+                    onClick={() => openWhatsAppOptions(selectedOrder)}
                   >
                     <span>📱</span> WA
                   </button>
@@ -4779,6 +4821,87 @@ export default function ManagerPanel() {
                     Close
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* WhatsApp Message Selection Modal */}
+        {showWaModal && waModalOrder && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-black/5 animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <span className="text-xl">📱</span> Send WhatsApp Update
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Order #{waModalOrder.id} • {waModalOrder.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowWaModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-black transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 font-medium mb-4">
+                Choose the message template you want to send to <span className="font-bold text-slate-800">{waModalOrder.name || 'Customer'}</span> (+91 {waModalOrder.phone}):
+              </p>
+
+              <div className="space-y-3">
+                {/* Option 1: Order Confirmation (Store Received) */}
+                <button
+                  onClick={() => {
+                    setShowWaModal(false);
+                    shareReceivedConfirmation(waModalOrder);
+                  }}
+                  className="w-full text-left p-4 rounded-2xl border border-green-200 bg-green-50/50 hover:bg-green-100/70 hover:border-green-400 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-black text-xs uppercase tracking-wide text-green-800 flex items-center gap-1.5">
+                      <span>📦</span> Order Confirmation
+                    </span>
+                    <span className="text-[10px] bg-green-600 text-white font-bold px-2 py-0.5 rounded-full uppercase">
+                      At Store
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Notifies the customer that order has been received at the store with service, pickup date, expected delivery &amp; tracking link.
+                  </p>
+                </button>
+
+                {/* Option 2: Full Detailed Invoice */}
+                <button
+                  onClick={() => {
+                    setShowWaModal(false);
+                    shareOnWhatsapp(waModalOrder);
+                  }}
+                  className="w-full text-left p-4 rounded-2xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 hover:border-blue-400 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-black text-xs uppercase tracking-wide text-blue-800 flex items-center gap-1.5">
+                      <span>🧺</span> Full Invoice &amp; Bill
+                    </span>
+                    <span className="text-[10px] bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full uppercase">
+                      ₹{waModalOrder.total}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Detailed bill with line items, total amount due, branch info, address and payment tracking.
+                  </p>
+                </button>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => setShowWaModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-all"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
