@@ -1641,7 +1641,7 @@ export default function AdminDashboard() {
                 <thead>
                   {/* Group Header Row */}
                   <tr className="text-[8px] font-black uppercase tracking-widest">
-                    <th colSpan={5} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
+                    <th colSpan={6} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
                     <th colSpan={5} className="px-4 pt-4 pb-2 bg-violet-500/10 text-violet-700 border-r-2 border-white/60 text-center">📦 Order &amp; Item Details</th>
                     <th colSpan={1} className="px-4 pt-4 pb-2 bg-red-500/10 text-red-700 text-center">⚡ Actions</th>
                   </tr>
@@ -1651,6 +1651,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Branch</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">CX Name</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Account Type</th>
+                    <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Segment</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5 border-r border-black/8">Mobile No.</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Order Date</th>
                     <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Items Ordered</th>
@@ -1669,6 +1670,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-24"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
+                        <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-14"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                         <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-32"></div></td>
@@ -1681,7 +1683,7 @@ export default function AdminDashboard() {
                     ))
                   ) : filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-8 text-center text-text-secondary font-bold uppercase tracking-wider text-xs">
+                      <td colSpan={13} className="p-8 text-center text-text-secondary font-bold uppercase tracking-wider text-xs">
                         No orders matching search query
                       </td>
                     </tr>
@@ -1723,6 +1725,24 @@ export default function AdminDashboard() {
                           <td className="px-4 py-2.5 font-bold whitespace-nowrap bg-blue-500/[0.02]">{cxName}</td>
                           <td className="px-4 py-2.5 whitespace-nowrap bg-blue-500/[0.02]">
                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${cxBadgeClass}`}>{cxType}</span>
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap bg-blue-500/[0.02]">
+                            {(() => {
+                              const seg = o.sourceSegment || (o.source === 'WhatsApp' ? 'SM' : o.source === 'App' ? 'AP' : o.source === 'Walk-in' ? 'RF' : 'WS');
+                              const segBadge: Record<string, { label: string, color: string }> = {
+                                'NP': { label: 'NP · NewsPaper', color: 'bg-amber-500/15 text-amber-700 border-amber-500/30' },
+                                'SM': { label: 'SM · Social',    color: 'bg-pink-500/15 text-pink-700 border-pink-500/30' },
+                                'RF': { label: 'RF · Ref',       color: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30' },
+                                'WS': { label: 'WS · Web',       color: 'bg-cyan-500/15 text-cyan-700 border-cyan-500/30' },
+                                'AP': { label: 'AP · App',       color: 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30' }
+                              };
+                              const b = segBadge[seg] || { label: seg, color: 'bg-gray-500/15 text-gray-700 border-gray-500/30' };
+                              return (
+                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${b.color}`}>
+                                  {b.label}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-blue-500/[0.02] border-r border-black/5">{mobile}</td>
                           {/* Order Details */}

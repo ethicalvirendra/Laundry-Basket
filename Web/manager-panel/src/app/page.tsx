@@ -1643,6 +1643,7 @@ export default function ManagerPanel() {
       `*Grand Total: ₹${order.total}*%0A` +
       `━━━━━━━━━━━━━━━━━━━━%0A` +
       `🔍 Track Order: https://www.laundrybasketunicorn.com/?track=${order.id}%0A%0A` +
+      `✨ *Pocket Light. Kapde Bright.*%0A` +
       `_Thank you for choosing Laundry Basket! 🙏_`;
     window.open(`https://wa.me/91${order.phone}?text=${message}`, '_blank');
   };
@@ -1674,6 +1675,7 @@ Our team has started processing your order. You'll receive updates as your order
 
 🔍 *Track Your Order:* https://www.laundrybasketunicorn.com/?track=${order.id}
 
+✨ *Pocket Light. Kapde Bright.*
 Thank you for trusting *Laundry Basket*. ❤️
 
 *Team Laundry Basket* 🧺`
