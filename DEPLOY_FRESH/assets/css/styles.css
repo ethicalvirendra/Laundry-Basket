@@ -3207,3 +3207,20 @@ textarea {
     height: 36px;
   }
 }
+
+/* 🪔 Diwali Festive Vibes Animations 🪔 */
+@keyframes diya-float {
+  0% { transform: translateY(0) rotate(-2deg); filter: drop-shadow(0 0 10px #f59e0b); }
+  100% { transform: translateY(-8px) rotate(3deg); filter: drop-shadow(0 0 22px #fbbf24); }
+}
+
+@keyframes diwali-flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(0.97); }
+}
+
+.diwali-festive-card:hover {
+  box-shadow: 0 25px 60px rgba(112, 26, 117, 0.35), 0 0 45px rgba(245, 158, 11, 0.3) !important;
+  transform: translateY(-2px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}

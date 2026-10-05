@@ -440,7 +440,7 @@
         const res = await fetch(`${API_BASE}/public/stores`);
         const stores = await res.json();
         const branchSelect = document.getElementById('select-branch');
-        if (branchSelect && stores.length > 0) {
+        if (branchSelect && branchSelect.tagName.toLowerCase() === 'select' && stores.length > 0) {
           branchSelect.innerHTML = '<option value="" disabled selected>Click to select branch...</option>' +
             stores.filter(s => s.approved).map(s => `<option value="${s.id}">${s.name}</option>`).join('');
           
