@@ -415,6 +415,12 @@ export default function ManagerPanel() {
   const [historyLimit, setHistoryLimit] = useState(25);
   const [historySourceFilter, setHistorySourceFilter] = useState<'All' | 'NP' | 'SM' | 'RF' | 'WS' | 'AP'>('All');
 
+  // States for dedicated Source Analytics & Tracking Tab
+  const [sourceTabActiveSource, setSourceTabActiveSource] = useState<'All' | 'NP' | 'SM' | 'RF' | 'WS' | 'AP'>('All');
+  const [sourceTabSearch, setSourceTabSearch] = useState('');
+  const [sourceTabPage, setSourceTabPage] = useState(1);
+  const [sourceTabLimit, setSourceTabLimit] = useState(25);
+
   const trackEvent = (name: string, props?: any) => {
     console.log(`🔥 Analytics: ${name}`, props);
   };
@@ -2258,6 +2264,12 @@ Thank you for trusting *Laundry Basket*. ❤️
               onClick={() => setActiveTab('earnings')}
             />
             <NavItem
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>}
+              label="Source Reports"
+              active={activeTab === 'source-reports'}
+              onClick={() => setActiveTab('source-reports')}
+            />
+            <NavItem
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" /></svg>}
               label="Business Statistics"
               active={activeTab === 'business-stats'}
@@ -2299,9 +2311,15 @@ Thank you for trusting *Laundry Basket*. ❤️
         <main className="manager-main flex-1 p-8 overflow-y-auto min-w-0">
           <header className="manager-header flex justify-between items-center mb-10">
             <div>
-              <h2 className="manager-page-title text-4xl font-black tracking-tight">Store Operations</h2>
+              <h2 className="manager-page-title text-4xl font-black tracking-tight">
+                {activeTab === 'source-reports' ? 'Source Reports & Marketing ROI' : 'Store Operations'}
+              </h2>
               <div className="flex flex-wrap items-center gap-3 mt-2">
-                <span className="bg-red-500/10 text-red-600 text-[10px] font-black px-2 py-1 rounded-full uppercase">{categorizedOrders.pending.length} Pending Pickups</span>
+                {activeTab === 'source-reports' ? (
+                  <span className="bg-purple-500/10 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full uppercase">Channel Attribution & Conversion Analytics</span>
+                ) : (
+                  <span className="bg-red-500/10 text-red-600 text-[10px] font-black px-2 py-1 rounded-full uppercase">{categorizedOrders.pending.length} Pending Pickups</span>
+                )}
                 <span className="text-text-secondary text-xs font-medium uppercase tracking-widest">Manager ID: {managerId}</span>
               </div>
             </div>
@@ -2964,6 +2982,322 @@ Thank you for trusting *Laundry Basket*. ❤️
               })()}
             </div>
           )}
+
+          {activeTab === 'source-reports' && (() => {
+            const allOrders = orders || [];
+            
+            // Channel definitions
+            const channels = [
+              { code: 'NP', name: 'NewsPaper Pamphlet', icon: '📰', color: 'amber', bg: 'bg-amber-500/10 text-amber-800 border-amber-500/30', border: 'border-amber-400' },
+              { code: 'SM', name: 'Social Media / WhatsApp', icon: '💬', color: 'pink', bg: 'bg-pink-500/10 text-pink-800 border-pink-500/30', border: 'border-pink-400' },
+              { code: 'RF', name: 'Reference / Walk-in / Referral', icon: '🚶', color: 'emerald', bg: 'bg-emerald-500/10 text-emerald-800 border-emerald-500/30', border: 'border-emerald-400' },
+              { code: 'WS', name: 'Website Direct', icon: '🌐', color: 'cyan', bg: 'bg-cyan-500/10 text-cyan-800 border-cyan-500/30', border: 'border-cyan-400' },
+              { code: 'AP', name: 'Customer Mobile App', icon: '📱', color: 'indigo', bg: 'bg-indigo-500/10 text-indigo-800 border-indigo-500/30', border: 'border-indigo-400' },
+            ];
+
+            // Helper to get normalized segment code
+            const getOrderSeg = (o: any) => {
+              if (o.sourceSegment) return o.sourceSegment;
+              const src = String(o.source || '').toLowerCase();
+              if (src.includes('whatsapp') || src.includes('social') || src.includes('sm')) return 'SM';
+              if (src.includes('walk-in') || src.includes('walkin') || src.includes('ref')) return 'RF';
+              if (src.includes('app') || src.includes('mobile')) return 'AP';
+              if (src.includes('web')) return 'WS';
+              if (src.includes('news') || src.includes('paper') || src.includes('np')) return 'NP';
+              return 'RF';
+            };
+
+            // Totals
+            const totalOrdersCount = allOrders.length || 1;
+            const totalRevenue = allOrders.reduce((sum: number, o: any) => sum + (Number(o.total || o.amount || 0)), 0) || 1;
+
+            // Channel aggregations
+            const channelStats = channels.map(ch => {
+              const matching = allOrders.filter((o: any) => getOrderSeg(o) === ch.code);
+              const count = matching.length;
+              const rev = matching.reduce((sum: number, o: any) => sum + (Number(o.total || o.amount || 0)), 0);
+              const received = matching.reduce((sum: number, o: any) => sum + (Number(o.received_amount || 0)), 0);
+              const pending = matching.reduce((sum: number, o: any) => sum + (Number(o.pending_amount || 0)), 0);
+              const pctOrders = totalOrdersCount > 0 ? ((count / totalOrdersCount) * 100).toFixed(1) : '0';
+              const pctRev = totalRevenue > 0 ? ((rev / totalRevenue) * 100).toFixed(1) : '0';
+              const aov = count > 0 ? Math.round(rev / count) : 0;
+              return { ...ch, count, rev, received, pending, pctOrders, pctRev, aov };
+            });
+
+            // Filter orders for table
+            const query = sourceTabSearch.toLowerCase().trim();
+            const filteredOrders = allOrders.filter((o: any) => {
+              if (sourceTabActiveSource !== 'All') {
+                if (getOrderSeg(o) !== sourceTabActiveSource) return false;
+              }
+              if (!query) return true;
+              const servicesMatch = o.services ? (Array.isArray(o.services) ? o.services.some((s: string) => s.toLowerCase().includes(query)) : String(o.services).toLowerCase().includes(query)) : false;
+              return (
+                (o.id && o.id.toLowerCase().includes(query)) ||
+                (o.customer_id && o.customer_id.toLowerCase().includes(query)) ||
+                (o.customer_name && o.customer_name.toLowerCase().includes(query)) ||
+                (o.name && o.name.toLowerCase().includes(query)) ||
+                (o.phone && o.phone.includes(query)) ||
+                (o.mobile_number && String(o.mobile_number).includes(query)) ||
+                (o.items_ordered && o.items_ordered.toLowerCase().includes(query)) ||
+                (o.service_type && o.service_type.toLowerCase().includes(query)) ||
+                servicesMatch ||
+                (o.order_date && String(o.order_date).toLowerCase().includes(query)) ||
+                (o.status && o.status.toLowerCase().includes(query)) ||
+                (o.timestamp && String(o.timestamp).toLowerCase().includes(query)) ||
+                (o.source && String(o.source).toLowerCase().includes(query)) ||
+                (o.sourceSegment && String(o.sourceSegment).toLowerCase().includes(query))
+              );
+            });
+
+            // Pagination for source tab
+            const totalRows = filteredOrders.length;
+            const totalPages = Math.ceil(totalRows / sourceTabLimit) || 1;
+            const currentPage = Math.min(sourceTabPage, totalPages);
+            const startIndex = (currentPage - 1) * sourceTabLimit;
+            const paginatedOrders = filteredOrders.slice(startIndex, startIndex + sourceTabLimit);
+
+            return (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Header Strip */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-700 text-[10px] font-black uppercase tracking-wider mb-2">
+                      <span>🎯</span> Marketing Source Segmentation · 27 Sep Protocol
+                    </div>
+                    <h3 className="text-4xl font-black tracking-tight text-text-primary">Source Attribution Reports</h3>
+                    <p className="text-text-secondary text-sm mt-1">
+                      Track customer acquisition channels, conversion rates, and revenue ROI across Newspaper, Social Media, Referrals, Website &amp; App.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowEODModal(true)}
+                      className="glass hover:bg-white/70 px-5 py-3 rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider text-text-primary border border-black/5 shadow-sm transition-all"
+                    >
+                      <span>📊</span> Download EOD Excel
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5 Channel Performance Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+                  {channelStats.map((ch) => {
+                    const isSelected = sourceTabActiveSource === ch.code;
+                    return (
+                      <div
+                        key={ch.code}
+                        onClick={() => {
+                          setSourceTabActiveSource(isSelected ? 'All' : ch.code as any);
+                          setSourceTabPage(1);
+                        }}
+                        className={`glass-card p-5 cursor-pointer transition-all border ${
+                          isSelected
+                            ? 'ring-2 ring-primary border-primary shadow-lg scale-[1.02] bg-white'
+                            : 'hover:shadow-md hover:scale-[1.01] border-black/5 bg-white/70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-2xl">{ch.icon}</span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border uppercase ${ch.bg}`}>
+                            {ch.code}
+                          </span>
+                        </div>
+                        <p className="text-xs font-black text-text-primary truncate mb-1" title={ch.name}>{ch.name}</p>
+                        <div className="flex items-baseline justify-between mt-2">
+                          <span className="text-2xl font-black text-slate-900">{ch.count.toLocaleString('en-IN')}</span>
+                          <span className="text-[10px] font-bold text-text-secondary">{ch.pctOrders}% of orders</span>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-black/5 flex items-center justify-between text-xs">
+                          <span className="text-[10px] font-bold text-text-secondary uppercase">Revenue</span>
+                          <span className="font-black text-emerald-700">₹{ch.rev.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-[10px] text-text-secondary">
+                          <span>AOV: ₹{ch.aov.toLocaleString('en-IN')}</span>
+                          <span className="font-bold text-primary">{ch.pctRev}% Rev</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-white/60 glass p-4 rounded-3xl border border-black/5 mb-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-black uppercase text-text-secondary tracking-wider mr-1">Channel Filter:</span>
+                    <button
+                      onClick={() => { setSourceTabActiveSource('All'); setSourceTabPage(1); }}
+                      className={`text-[10px] font-black px-3.5 py-2 rounded-xl transition-all cursor-pointer border ${
+                        sourceTabActiveSource === 'All'
+                          ? 'bg-primary text-white border-primary shadow-sm scale-105'
+                          : 'bg-white/80 text-text-secondary hover:bg-white border-black/5'
+                      }`}
+                    >
+                      All Channels ({allOrders.length})
+                    </button>
+                    {channels.map(ch => {
+                      const count = allOrders.filter((o: any) => getOrderSeg(o) === ch.code).length;
+                      const active = sourceTabActiveSource === ch.code;
+                      return (
+                        <button
+                          key={ch.code}
+                          onClick={() => { setSourceTabActiveSource(ch.code as any); setSourceTabPage(1); }}
+                          className={`text-[10px] font-black px-3 py-2 rounded-xl transition-all cursor-pointer border ${
+                            active
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-sm scale-105'
+                              : 'bg-white/80 text-text-secondary hover:bg-white border-black/5'
+                          }`}
+                        >
+                          {ch.icon} {ch.code} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={sourceTabSearch}
+                      onChange={(e) => { setSourceTabSearch(e.target.value); setSourceTabPage(1); }}
+                      placeholder="Search within source orders (ID, Name, Phone)..."
+                      className="glass px-5 py-2.5 text-xs outline-none focus:border-primary/40 transition-all rounded-2xl w-80 max-w-full font-bold bg-white/80"
+                    />
+                    {sourceTabSearch && (
+                      <button
+                        onClick={() => { setSourceTabSearch(''); setSourceTabPage(1); }}
+                        className="text-xs font-bold text-red-500 hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filtered Orders Table */}
+                <div className="glass overflow-x-auto rounded-3xl border border-black/5 bg-white/40">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[8px] font-black uppercase tracking-widest">
+                        <th colSpan={4} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
+                        <th colSpan={4} className="px-4 pt-4 pb-2 bg-purple-500/10 text-purple-700 border-r-2 border-white/60 text-center">📍 Source &amp; Order</th>
+                        <th colSpan={3} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Revenue &amp; Payment</th>
+                        <th colSpan={1} className="px-4 pt-4 pb-2 bg-red-500/10 text-red-700 text-center">⚡ Actions</th>
+                      </tr>
+                      <tr className="border-b-2 border-black/5 text-[9px] font-black uppercase tracking-widest text-text-secondary">
+                        <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Customer ID</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">CX Name</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Account Type</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5 border-r border-black/8">Mobile No.</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-purple-500/5">Marketing Source</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-purple-500/5">Order Date</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-purple-500/5">Items Ordered</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-purple-500/5 border-r border-black/8">Status</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Total Amount</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Payment Status</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5 border-r border-black/8">Payment Mode</th>
+                        <th className="px-4 py-3 whitespace-nowrap bg-red-500/5 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5">
+                      {paginatedOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={12} className="px-4 py-16 text-center text-text-secondary font-black uppercase tracking-widest text-xs">
+                            No orders found for the selected acquisition source
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedOrders.map((o: any) => {
+                          const cxId = o.customer_id || o.id || '-';
+                          const cxName = o.customer_name || o.name || '-';
+                          const mobile = o.mobile_number || o.phone || '-';
+                          const orderDate = o.order_date || (o.timestamp ? o.timestamp.split(',')[0] : '-');
+                          const items = o.items_ordered || (Array.isArray(o.services) ? o.services.join(', ') : o.services) || '-';
+                          const cxType = o.cx_type || (o.source === 'Business' ? 'Business' : 'Residential');
+                          const status = o.status || 'Pending';
+                          const orderTotal = Number(o.total || o.amount || 0);
+                          const seg = getOrderSeg(o);
+                          const segInfo = channels.find(c => c.code === seg) || { code: seg, name: 'Unknown', icon: '📍', bg: 'bg-gray-500/10 text-gray-700 border-gray-500/20' };
+
+                          const rawPaymentStatus = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                          const paymentStatus = String(rawPaymentStatus).toLowerCase().includes('received') ? 'Received' : 'Pending';
+                          const paymentMode = o.paymentMode || o.payment_mode || (paymentStatus === 'Received' ? 'Cash' : 'Not Set');
+
+                          return (
+                            <tr key={`src-tab-${o.id}`} className="hover:bg-white/60 transition-colors text-[11px]">
+                              <td className="px-4 py-2.5 font-black text-primary whitespace-nowrap bg-blue-500/[0.02]">{cxId}</td>
+                              <td className="px-4 py-2.5 font-bold whitespace-nowrap bg-blue-500/[0.02]">{cxName}</td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-blue-500/[0.02]">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${
+                                  cxType === 'Business' ? 'bg-blue-600/15 text-blue-700' : 'bg-green-500/15 text-green-700'
+                                }`}>
+                                  {cxType}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-blue-500/[0.02] border-r border-black/5">{mobile}</td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-purple-500/[0.02]">
+                                <span className={`text-[9px] font-black px-2 py-1 rounded-md border uppercase inline-flex items-center gap-1 ${segInfo.bg}`}>
+                                  <span>{segInfo.icon}</span> {segInfo.code} · {segInfo.name.split('/')[0].trim()}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-text-secondary whitespace-nowrap bg-purple-500/[0.02]">{orderDate}</td>
+                              <td className="px-4 py-2.5 text-text-secondary max-w-[200px] truncate bg-purple-500/[0.02]" title={typeof items === 'string' ? items : ''}>{items}</td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-purple-500/[0.02] border-r border-black/5">
+                                <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase bg-primary/10 text-primary">
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 font-black whitespace-nowrap bg-emerald-500/[0.02]">₹{orderTotal.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${
+                                  paymentStatus === 'Received' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-amber-500/15 text-amber-700'
+                                }`}>
+                                  {paymentStatus}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02] border-r border-black/5 text-[10px] font-black uppercase text-emerald-700">
+                                {paymentMode}
+                              </td>
+                              <td className="px-4 py-2.5 whitespace-nowrap bg-red-500/[0.01] text-center">
+                                <button className="text-primary font-bold text-xs hover:underline uppercase tracking-wide mr-2" onClick={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}>👁️ View</button>
+                                <button className="text-blue-500 font-bold text-xs hover:underline uppercase tracking-wide" onClick={() => handleStartEditOrder(o)}>✏️ Edit</button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination footer */}
+                {totalRows > 0 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
+                    <span className="text-xs font-bold text-text-secondary">
+                      Showing {startIndex + 1} to {Math.min(startIndex + sourceTabLimit, totalRows)} of {totalRows} orders
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSourceTabPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border border-black/5 bg-white/70 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        Prev
+                      </button>
+                      <span className="text-xs font-black px-3 py-1 bg-white rounded-xl border border-black/5">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setSourceTabPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border border-black/5 bg-white/70 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {activeTab === 'business-stats' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
