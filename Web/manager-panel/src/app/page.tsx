@@ -413,6 +413,7 @@ export default function ManagerPanel() {
   // Pagination states for Order History
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLimit, setHistoryLimit] = useState(25);
+  const [historySourceFilter, setHistorySourceFilter] = useState<'All' | 'NP' | 'SM' | 'RF' | 'WS' | 'AP'>('All');
 
   const trackEvent = (name: string, props?: any) => {
     console.log(`🔥 Analytics: ${name}`, props);
@@ -2515,6 +2516,92 @@ Thank you for trusting *Laundry Basket*. ❤️
                 </div>
               </div>
 
+              {/* Marketing Acquisition Source Breakdown Strip */}
+              {(() => {
+                const historyOrders = categorizedOrders.history || [];
+                const npCount = historyOrders.filter((o: any) => o.sourceSegment === 'NP').length;
+                const smCount = historyOrders.filter((o: any) => o.sourceSegment === 'SM' || o.source === 'WhatsApp').length;
+                const rfCount = historyOrders.filter((o: any) => o.sourceSegment === 'RF' || o.source === 'Walk-in').length;
+                const wsCount = historyOrders.filter((o: any) => o.sourceSegment === 'WS' || o.source === 'Web' || o.source === 'Website').length;
+                const apCount = historyOrders.filter((o: any) => o.sourceSegment === 'AP' || o.source === 'App').length;
+
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-white/40 glass p-3.5 rounded-2xl border border-black/5 mb-6">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-black uppercase text-text-secondary tracking-wider mr-1">📍 Source Tracking:</span>
+                      <button
+                        onClick={() => { setHistorySourceFilter('All'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'All'
+                            ? 'bg-primary text-white border-primary shadow-sm scale-105'
+                            : 'bg-white/70 text-text-secondary hover:bg-white border-black/5'
+                        }`}
+                      >
+                        All Sources ({historyOrders.length})
+                      </button>
+                      <button
+                        onClick={() => { setHistorySourceFilter('NP'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'NP'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-sm scale-105'
+                            : 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border-amber-500/30'
+                        }`}
+                      >
+                        📰 NewsPaper NP ({npCount})
+                      </button>
+                      <button
+                        onClick={() => { setHistorySourceFilter('SM'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'SM'
+                            ? 'bg-pink-600 text-white border-pink-700 shadow-sm scale-105'
+                            : 'bg-pink-500/10 text-pink-700 hover:bg-pink-500/20 border-pink-500/30'
+                        }`}
+                      >
+                        💬 Social/WA SM ({smCount})
+                      </button>
+                      <button
+                        onClick={() => { setHistorySourceFilter('RF'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'RF'
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm scale-105'
+                            : 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-500/30'
+                        }`}
+                      >
+                        🚶 Walk-in/Ref RF ({rfCount})
+                      </button>
+                      <button
+                        onClick={() => { setHistorySourceFilter('WS'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'WS'
+                            ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm scale-105'
+                            : 'bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 border-cyan-500/30'
+                        }`}
+                      >
+                        🌐 Website WS ({wsCount})
+                      </button>
+                      <button
+                        onClick={() => { setHistorySourceFilter('AP'); setHistoryPage(1); }}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
+                          historySourceFilter === 'AP'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm scale-105'
+                            : 'bg-indigo-500/10 text-indigo-700 hover:bg-indigo-500/20 border-indigo-500/30'
+                        }`}
+                      >
+                        📱 Customer App AP ({apCount})
+                      </button>
+                    </div>
+                    {historySourceFilter !== 'All' && (
+                      <button
+                        onClick={() => { setHistorySourceFilter('All'); setHistoryPage(1); }}
+                        className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                      >
+                        Reset Filter ✕
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="glass overflow-x-auto rounded-3xl border border-black/5">
                 <table className="w-full text-left">
                   <thead>
@@ -2564,6 +2651,13 @@ Thank you for trusting *Laundry Basket*. ❤️
 
                       const query = orderSearch.toLowerCase();
                       const filtered = categorizedOrders.history.filter((o: any) => {
+                        // 1. Source Filter Check
+                        if (historySourceFilter !== 'All') {
+                          const seg = o.sourceSegment || (o.source === 'WhatsApp' ? 'SM' : o.source === 'App' ? 'AP' : o.source === 'Walk-in' ? 'RF' : o.source === 'Web' ? 'WS' : 'RF');
+                          if (seg !== historySourceFilter) return false;
+                        }
+
+                        // 2. Query Search Check
                         if (!query) return true;
                         const servicesMatch = o.services ? (Array.isArray(o.services) ? o.services.some((s: string) => s.toLowerCase().includes(query)) : String(o.services).toLowerCase().includes(query)) : false;
                         return (
@@ -2578,7 +2672,9 @@ Thank you for trusting *Laundry Basket*. ❤️
                           servicesMatch ||
                           (o.order_date && String(o.order_date).toLowerCase().includes(query)) ||
                           (o.status && o.status.toLowerCase().includes(query)) ||
-                          (o.timestamp && String(o.timestamp).toLowerCase().includes(query))
+                          (o.timestamp && String(o.timestamp).toLowerCase().includes(query)) ||
+                          (o.source && String(o.source).toLowerCase().includes(query)) ||
+                          (o.sourceSegment && String(o.sourceSegment).toLowerCase().includes(query))
                         );
                       });
                       if (filtered.length === 0) return (

@@ -393,12 +393,12 @@ mongoose.connect(process.env.MONGODB_URI)
                 const deleteResult = await Order.deleteMany({});
                 console.log(`✅ Purged ${deleteResult.deletedCount} orders successfully.`);
                 
-                // 2. Load and parse the Excel file
-                const xlsx = require('xlsx');
+                let xlsx;
+                try { xlsx = require('xlsx'); } catch(e) { console.log('xlsx module not installed, skipping legacy importer'); }
                 const excelPath = "C:/Users/viren/Downloads/ORDER LIST.xlsx";
                 console.log(`Loading Excel from: ${excelPath}`);
                 
-                if (fs.existsSync(excelPath)) {
+                if (xlsx && fs.existsSync(excelPath)) {
                     const workbook = xlsx.readFile(excelPath);
                     const sheetName = workbook.SheetNames[0];
                     const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
@@ -2960,7 +2960,11 @@ app.post('/api/purge', verifyToken, async (req, res) => {
 // HTTP On-Demand Excel Importer
 app.get('/api/admin/import-excel', async (req, res) => {
     const fs = require('fs');
-    const xlsx = require('xlsx');
+    let xlsx;
+    try { xlsx = require('xlsx'); } catch(e) {}
+    if (!xlsx) {
+        return res.status(500).json({ error: 'Legacy xlsx library is not installed.' });
+    }
     const excelPath = "C:/Users/viren/Downloads/ORDER LIST.xlsx";
     
     console.log('⚡ On-Demand Excel Import triggered via HTTP GET...');
@@ -3393,7 +3397,7 @@ app.get('/api/subscribers', verifyToken, async (req, res) => {
 });
 
 // EXPORT & LOGS
-const xlsx = require('xlsx');
+const ExcelJS = require('exceljs');
 
 app.get('/api/export/excel', verifyToken, async (req, res) => {
     try {
@@ -3449,6 +3453,15 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
                 return `${parsed.name} (${parsed.qty} pcs)`;
             }).join(', ');
 
+            const seg = order.sourceSegment || (order.source === 'WhatsApp' ? 'SM' : order.source === 'App' ? 'AP' : order.source === 'Walk-in' ? 'RF' : order.source === 'Web' ? 'WS' : 'RF');
+            const segMap = {
+                'NP': 'NewsPaper (NP)',
+                'SM': 'Social / WhatsApp (SM)',
+                'RF': 'Walk-in / Ref (RF)',
+                'WS': 'Website (WS)',
+                'AP': 'Customer App (AP)'
+            };
+
             return {
                 'Order ID': order.id,
                 'Store ID': order.storeId || 'GLOBAL',
@@ -3458,6 +3471,7 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
                 'Phone': order.phone,
                 'Address': order.address || 'Walk-in',
                 'Source': order.source || 'Walk-in',
+                'Marketing Source': segMap[seg] || seg,
                 'Account Type': order.cx_type || 'Residential',
                 'Customer Status': order.isRepeatCustomer ? 'Repeat Customer' : 'New Customer',
                 'Services': cleanServicesStr,
@@ -3537,48 +3551,81 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
             'Proportional Revenue (₹)': Math.round(serviceMapStats[name].revenue)
         })).sort((a, b) => b['Total Orders'] - a['Total Orders']);
 
-        // Write Sheets to Workbook
-        const workbook = xlsx.utils.book_new();
-        
-        const worksheetOrders = xlsx.utils.json_to_sheet(data);
-        const worksheetStore = xlsx.utils.json_to_sheet(storeAnalytics);
-        const worksheetService = xlsx.utils.json_to_sheet(serviceAnalytics);
-        
-        // Auto-fit Helper
-        const autofit = (worksheet, sheetData) => {
-            if (sheetData.length > 0) {
-                const colWidths = Object.keys(sheetData[0]).map(key => {
-                    const maxLen = Math.max(
-                        key.length,
-                        ...sheetData.map(row => String(row[key] ?? '').length)
-                    );
-                    return { wch: maxLen + 3 };
-                });
-                worksheet['!cols'] = colWidths;
-            }
+        // 4. Generate Acquisition Source Analytics Sheet
+        const sourceMapStats = {
+            'NP': { name: 'NewsPaper pamphlet (NP)', count: 0, revenue: 0 },
+            'SM': { name: 'Social Media / WhatsApp (SM)', count: 0, revenue: 0 },
+            'RF': { name: 'Reference / Walk-in (RF)', count: 0, revenue: 0 },
+            'WS': { name: 'Website Direct (WS)', count: 0, revenue: 0 },
+            'AP': { name: 'Customer Mobile App (AP)', count: 0, revenue: 0 }
         };
-        
-        autofit(worksheetOrders, data);
-        autofit(worksheetStore, storeAnalytics);
-        autofit(worksheetService, serviceAnalytics);
-        
-        xlsx.utils.book_append_sheet(workbook, worksheetOrders, 'Orders Log');
+
+        let totalRev = 0;
+        finalOrders.forEach(o => {
+            const seg = o.sourceSegment || (o.source === 'WhatsApp' ? 'SM' : o.source === 'App' ? 'AP' : o.source === 'Walk-in' ? 'RF' : o.source === 'Web' ? 'WS' : 'RF');
+            const target = sourceMapStats[seg] || sourceMapStats['RF'];
+            const net = Number(o.total) || 0;
+            target.count += 1;
+            target.revenue += net;
+            totalRev += net;
+        });
+
+        const totalOrdersCount = finalOrders.length || 1;
+        const sourceAnalytics = Object.keys(sourceMapStats).map(code => {
+            const item = sourceMapStats[code];
+            const orderShare = Math.round((item.count / totalOrdersCount) * 100);
+            const revShare = totalRev > 0 ? Math.round((item.revenue / totalRev) * 100) : 0;
+            return {
+                'Source Code': code,
+                'Acquisition Channel': item.name,
+                'Total Orders': item.count,
+                'Order Share (%)': `${orderShare}%`,
+                'Total Revenue (₹)': Math.round(item.revenue),
+                'Revenue Share (%)': `${revShare}%`
+            };
+        }).sort((a, b) => b['Total Orders'] - a['Total Orders']);
+
+        // Write Sheets to Workbook using ExcelJS
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Laundry Basket';
+        workbook.created = new Date();
+
+        const addJsonSheet = (sheetName, rows) => {
+            if (!rows || rows.length === 0) return;
+            const sheet = workbook.addWorksheet(sheetName);
+            const headers = Object.keys(rows[0]);
+            sheet.columns = headers.map(key => {
+                const maxLen = Math.max(
+                    key.length,
+                    ...rows.map(r => String(r[key] ?? '').length)
+                );
+                return { header: key, key: key, width: Math.max(12, maxLen + 3) };
+            });
+            sheet.addRows(rows);
+            const headerRow = sheet.getRow(1);
+            headerRow.font = { bold: true };
+        };
+
+        addJsonSheet('Orders Log', data);
+        if (sourceAnalytics.length > 0) {
+            addJsonSheet('Source Analytics', sourceAnalytics);
+        }
         if (storeAnalytics.length > 0) {
-            xlsx.utils.book_append_sheet(workbook, worksheetStore, 'Store Analytics');
+            addJsonSheet('Store Analytics', storeAnalytics);
         }
         if (serviceAnalytics.length > 0) {
-            xlsx.utils.book_append_sheet(workbook, worksheetService, 'Service Analytics');
+            addJsonSheet('Service Analytics', serviceAnalytics);
         }
-        
-        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-        
+
+        const buffer = await workbook.xlsx.writeBuffer();
+
         const filename = req.query.allTime === 'true' 
             ? 'Total_Business_Report.xlsx' 
             : `Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
             
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.send(buffer);
+        res.send(Buffer.from(buffer));
     } catch (error) {
         console.error("Export error:", error);
         res.status(500).json({ error: 'Failed to generate Excel file' });

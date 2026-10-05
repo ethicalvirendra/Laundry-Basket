@@ -3453,6 +3453,15 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
                 return `${parsed.name} (${parsed.qty} pcs)`;
             }).join(', ');
 
+            const seg = order.sourceSegment || (order.source === 'WhatsApp' ? 'SM' : order.source === 'App' ? 'AP' : order.source === 'Walk-in' ? 'RF' : order.source === 'Web' ? 'WS' : 'RF');
+            const segMap = {
+                'NP': 'NewsPaper (NP)',
+                'SM': 'Social / WhatsApp (SM)',
+                'RF': 'Walk-in / Ref (RF)',
+                'WS': 'Website (WS)',
+                'AP': 'Customer App (AP)'
+            };
+
             return {
                 'Order ID': order.id,
                 'Store ID': order.storeId || 'GLOBAL',
@@ -3462,6 +3471,7 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
                 'Phone': order.phone,
                 'Address': order.address || 'Walk-in',
                 'Source': order.source || 'Walk-in',
+                'Marketing Source': segMap[seg] || seg,
                 'Account Type': order.cx_type || 'Residential',
                 'Customer Status': order.isRepeatCustomer ? 'Repeat Customer' : 'New Customer',
                 'Services': cleanServicesStr,
@@ -3541,6 +3551,40 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
             'Proportional Revenue (₹)': Math.round(serviceMapStats[name].revenue)
         })).sort((a, b) => b['Total Orders'] - a['Total Orders']);
 
+        // 4. Generate Acquisition Source Analytics Sheet
+        const sourceMapStats = {
+            'NP': { name: 'NewsPaper pamphlet (NP)', count: 0, revenue: 0 },
+            'SM': { name: 'Social Media / WhatsApp (SM)', count: 0, revenue: 0 },
+            'RF': { name: 'Reference / Walk-in (RF)', count: 0, revenue: 0 },
+            'WS': { name: 'Website Direct (WS)', count: 0, revenue: 0 },
+            'AP': { name: 'Customer Mobile App (AP)', count: 0, revenue: 0 }
+        };
+
+        let totalRev = 0;
+        finalOrders.forEach(o => {
+            const seg = o.sourceSegment || (o.source === 'WhatsApp' ? 'SM' : o.source === 'App' ? 'AP' : o.source === 'Walk-in' ? 'RF' : o.source === 'Web' ? 'WS' : 'RF');
+            const target = sourceMapStats[seg] || sourceMapStats['RF'];
+            const net = Number(o.total) || 0;
+            target.count += 1;
+            target.revenue += net;
+            totalRev += net;
+        });
+
+        const totalOrdersCount = finalOrders.length || 1;
+        const sourceAnalytics = Object.keys(sourceMapStats).map(code => {
+            const item = sourceMapStats[code];
+            const orderShare = Math.round((item.count / totalOrdersCount) * 100);
+            const revShare = totalRev > 0 ? Math.round((item.revenue / totalRev) * 100) : 0;
+            return {
+                'Source Code': code,
+                'Acquisition Channel': item.name,
+                'Total Orders': item.count,
+                'Order Share (%)': `${orderShare}%`,
+                'Total Revenue (₹)': Math.round(item.revenue),
+                'Revenue Share (%)': `${revShare}%`
+            };
+        }).sort((a, b) => b['Total Orders'] - a['Total Orders']);
+
         // Write Sheets to Workbook using ExcelJS
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Laundry Basket';
@@ -3563,6 +3607,9 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
         };
 
         addJsonSheet('Orders Log', data);
+        if (sourceAnalytics.length > 0) {
+            addJsonSheet('Source Analytics', sourceAnalytics);
+        }
         if (storeAnalytics.length > 0) {
             addJsonSheet('Store Analytics', storeAnalytics);
         }
