@@ -3089,7 +3089,13 @@ app.get('/api/admin/import-excel', async (req, res) => {
 app.get('/api/public/stores', async (req, res) => {
     try {
         const stores = await Store.find({ approved: true });
-        res.json(stores);
+        const normalized = stores.map(s => {
+            const obj = s.toObject();
+            if (!obj.address && obj.location) obj.address = obj.location;
+            if (!obj.location && obj.address) obj.location = obj.address;
+            return obj;
+        });
+        res.json(normalized);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
