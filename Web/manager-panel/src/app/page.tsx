@@ -17,7 +17,7 @@ type InvoiceEstimate = {
 };
 
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import * as XLSX from 'xlsx';
 import { PAYMENT_QR_BASE64 } from './paymentQrBase64';
 
@@ -1119,26 +1119,25 @@ export default function ManagerPanel() {
               if (!el.style) return;
               const computed = clonedDoc.defaultView?.getComputedStyle(el);
               if (computed) {
-                if (computed.color && (computed.color.includes('lab') || computed.color.includes('oklch'))) {
-                  el.style.color = toRgb(computed.color);
-                }
-                if (computed.backgroundColor && (computed.backgroundColor.includes('lab') || computed.backgroundColor.includes('oklch'))) {
-                  el.style.backgroundColor = toRgb(computed.backgroundColor);
-                }
-                if (computed.borderColor && (computed.borderColor.includes('lab') || computed.borderColor.includes('oklch'))) {
-                  el.style.borderColor = toRgb(computed.borderColor);
-                }
+                const colorProps = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor'] as const;
+                colorProps.forEach((prop) => {
+                  const val = (computed as any)[prop];
+                  if (val && (val.includes('lab') || val.includes('oklch') || val.includes('color('))) {
+                    (el.style as any)[prop] = toRgb(val);
+                  }
+                });
               }
             });
           }
 
-          // Strip/replace modern color functions from all stylesheet tags
+          // Strip/replace modern color functions from all stylesheet tags and rules
           const styles = clonedDoc.querySelectorAll('style');
           styles.forEach(s => {
-            if (s.textContent && (s.textContent.includes('lab(') || s.textContent.includes('oklch('))) {
+            if (s.textContent && (s.textContent.includes('lab(') || s.textContent.includes('oklch(') || s.textContent.includes('color('))) {
               s.textContent = s.textContent
                 .replace(/lab\([^)]+\)/gi, '#1e293b')
-                .replace(/oklch\([^)]+\)/gi, '#3b82f6');
+                .replace(/oklch\([^)]+\)/gi, '#3b82f6')
+                .replace(/color\([^)]+\)/gi, '#1e293b');
             }
           });
         }

@@ -579,7 +579,9 @@ const OrderSchema = new mongoose.Schema({
     appliedReferralCode: { type: String, default: null },
     referralDiscount: { type: Number, default: 0 },
     referralRewardClaimed: { type: Boolean, default: false },
-    redeemedPoints: { type: Number, default: 0 }
+    redeemedPoints: { type: Number, default: 0 },
+    originStoreId: { type: String, default: null },
+    virtualBranch: { type: String, default: null }
 });
 OrderSchema.index({ storeId: 1, _id: -1 });
 OrderSchema.index({ phone: 1 });
@@ -1858,9 +1860,15 @@ app.post('/api/referral/validate-points', verifyToken, async (req, res) => {
 // POST: Create New Order
 app.post('/api/orders', async (req, res) => {
     try {
-        const finalStoreId = req.body.storeId || 'LBBPL';
+        // 🏬 CENTRAL ORDER ROUTING: All incoming orders land on Ayodhya Nagar Hub (Flagship - LBBPL)
+        const incomingStoreId = req.body.storeId || 'LBBPL';
+        const finalStoreId = 'LBBPL'; // Primary central fulfilling hub
+        const virtualStore = await Store.findOne({ id: incomingStoreId });
+        const originStoreId = incomingStoreId;
+        const virtualBranch = virtualStore ? virtualStore.name : (req.body.virtualBranch || incomingStoreId);
+
         const store = await Store.findOne({ id: finalStoreId });
-        let branchCode = store ? (store.branchCode || 'GEN') : 'GEN';        
+        let branchCode = store ? (store.branchCode || 'LBBPL') : 'LBBPL';        
         
         // Fetch customer to check account type if not provided
         let isHotel = req.body.accountType === 'Hotel';
@@ -1993,6 +2001,8 @@ app.post('/api/orders', async (req, res) => {
         const orderData = {
             ...req.body,
             storeId: finalStoreId,
+            originStoreId: originStoreId,
+            virtualBranch: virtualBranch,
             id: orderId,
             cx_type: cxType,
             subtotal: subtotal,
