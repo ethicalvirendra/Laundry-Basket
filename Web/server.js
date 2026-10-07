@@ -362,6 +362,7 @@ mongoose.connect(process.env.MONGODB_URI)
             await Order.updateMany(
                 {
                     $or: [
+                        { id: /^LBBPLAN/i },
                         { id: /^LB10/i },
                         { id: /^LBEV/i },
                         { status: { $in: ['Pending', 'Out for Pickup', 'Pickup Done', 'Delivered at Store', 'Washing', 'Drying', 'Ironing', 'Processing', 'Ready', 'Out for Delivery'] } }
@@ -1932,7 +1933,7 @@ app.post('/api/orders', async (req, res) => {
                     const seqPadded = String(counter.seq).padStart(6, '0');
                     orderId = `LBB${storeName}${seqPadded}`;
                 } else {
-                    orderId = `LB${counter.seq}`;
+                    orderId = `LBBPLAN${counter.seq}`;
                 }
                 const existing = await Order.findOne({ id: orderId });
                 if (!existing) {
