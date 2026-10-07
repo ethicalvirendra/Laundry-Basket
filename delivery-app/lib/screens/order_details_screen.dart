@@ -63,6 +63,266 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
 
 
+  Future<void> _showChangeFinalAmountDialog() async {
+    final currentTotal = (widget.order['total'] ?? 0).toString();
+    final amountController = TextEditingController(text: currentTotal == '0' ? '' : currentTotal);
+    final reasonController = TextEditingController();
+    bool confirmedByManager = false;
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (innerCtx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(AppConfig.primaryColor).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.currency_rupee_rounded, color: Color(AppConfig.primaryColor), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Change Final Amount",
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900, fontSize: 16),
+                        ),
+                        Text(
+                          "Order #${widget.order['id']}",
+                          style: GoogleFonts.plusJakartaSans(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.shield_outlined, color: Colors.amber.shade900, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Any price change requires verbal or written confirmation from the Store Manager before updating.",
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "New Final Amount (₹)",
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade800),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      autofocus: true,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w900),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.currency_rupee_rounded, color: Color(AppConfig.primaryColor)),
+                        hintText: "Enter final amount (e.g. 150)",
+                        hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.grey.shade400),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: Color(AppConfig.primaryColor), width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      "Reason / Note (Optional)",
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade800),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: reasonController,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: "e.g. Extra garments added, discount approved by manager",
+                        hintStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: Colors.grey.shade400),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Manager confirmation checkbox
+                    Container(
+                      decoration: BoxDecoration(
+                        color: confirmedByManager ? Colors.green.shade50 : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: confirmedByManager ? Colors.green.shade400 : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: CheckboxListTile(
+                        value: confirmedByManager,
+                        activeColor: Colors.green.shade700,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        title: Text(
+                          "I confirm manager approved this amount",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: confirmedByManager ? Colors.green.shade900 : Colors.black87,
+                          ),
+                        ),
+                        subtitle: Text(
+                          "Confirmation verified with branch manager",
+                          style: GoogleFonts.plusJakartaSans(fontSize: 10, color: Colors.grey.shade600),
+                        ),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            confirmedByManager = val ?? false;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+                  child: Text(
+                    "CANCEL",
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: (!confirmedByManager || isSaving)
+                      ? null
+                      : () async {
+                          final parsedAmount = double.tryParse(amountController.text.trim());
+                          if (parsedAmount == null || parsedAmount < 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Please enter a valid amount")),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final prefs = await SharedPreferences.getInstance();
+                            final token = prefs.getString('rider_token');
+                            final riderName = prefs.getString('rider_name') ?? 'Rider';
+                            final orderId = widget.order['id'];
+
+                            final reason = reasonController.text.trim();
+                            final note = reason.isNotEmpty 
+                                ? "$reason (Confirmed by Manager)" 
+                                : "Amount updated by rider $riderName (Confirmed by Manager)";
+
+                            final response = await http.put(
+                              Uri.parse('${AppConfig.baseUrl}/api/orders/$orderId'),
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer $token',
+                              },
+                              body: jsonEncode({
+                                'total': parsedAmount,
+                                'subtotal': parsedAmount,
+                                'managerConfirmedAmount': true,
+                                'amountChangeReason': note,
+                              }),
+                            );
+
+                            if (response.statusCode == 200) {
+                              if (mounted) {
+                                setState(() {
+                                  widget.order['total'] = parsedAmount;
+                                  widget.order['subtotal'] = parsedAmount;
+                                });
+                                Navigator.pop(dialogCtx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle, color: Colors.white),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            "Final amount updated to ₹${parsedAmount.toStringAsFixed(0)} (Manager Confirmed)",
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    backgroundColor: Colors.green.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                );
+                              }
+                            } else {
+                              throw Exception("Failed: ${response.body}");
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Error updating amount: $e"), backgroundColor: Colors.red),
+                              );
+                            }
+                          } finally {
+                            if (innerCtx.mounted) {
+                              setDialogState(() => isSaving = false);
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(AppConfig.primaryColor),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.grey.shade500,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  ),
+                  child: isSaving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          "SAVE AMOUNT",
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w900),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ─── Photo Upload Helpers ────────────────────────────────────────────────
 
   /// Shows a bottom sheet to take/pick a photo, uploads it, and returns success.
@@ -643,6 +903,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               minimumSize: const Size(double.infinity, 44),
                               textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _showChangeFinalAmountDialog,
+                            icon: const Icon(Icons.price_change_rounded, size: 18, color: Colors.green),
+                            label: const Text("CHANGE FINAL AMOUNT (MANAGER CONFIRMED)"),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.green.shade800,
+                              side: BorderSide(color: Colors.green.shade400, width: 1.5),
+                              backgroundColor: Colors.green.shade50,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              minimumSize: const Size(double.infinity, 44),
+                              textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 11.5),
                             ),
                           ),
                         ],

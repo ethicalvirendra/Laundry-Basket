@@ -582,7 +582,9 @@ const OrderSchema = new mongoose.Schema({
     referralRewardClaimed: { type: Boolean, default: false },
     redeemedPoints: { type: Number, default: 0 },
     originStoreId: { type: String, default: null },
-    virtualBranch: { type: String, default: null }
+    virtualBranch: { type: String, default: null },
+    managerConfirmedAmount: { type: Boolean, default: false },
+    amountChangeReason: { type: String, default: null }
 });
 OrderSchema.index({ storeId: 1, _id: -1 });
 OrderSchema.index({ phone: 1 });
@@ -2199,6 +2201,16 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         const isTransfer = newStoreId && newStoreId !== oldStoreId;
 
         const updateData = { ...req.body };
+        if (req.body.total !== undefined) {
+            const newTotal = Number(req.body.total) || 0;
+            updateData.total = newTotal;
+            updateData.commission = Math.round(newTotal * 0.05);
+            updateData.netEarning = newTotal - updateData.commission;
+            if (updateData.subtotal === undefined) {
+                updateData.subtotal = newTotal;
+            }
+        }
+
         if (req.body.paymentStatus || req.body.payment_status) {
             const rawStatus = req.body.paymentStatus || req.body.payment_status;
             const isRcv = String(rawStatus).toLowerCase().includes('received');
@@ -2227,6 +2239,9 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         const eventsToPush = [];
         if (req.body.status) {
             eventsToPush.push({ status: req.body.status });
+        }
+        if (req.body.managerConfirmedAmount && req.body.total !== undefined) {
+            eventsToPush.push({ status: `Amount updated to ₹${req.body.total} (Confirmed by Manager)` });
         }
         if (isTransfer) {
             const oldStore = await Store.findOne({ id: oldStoreId });
