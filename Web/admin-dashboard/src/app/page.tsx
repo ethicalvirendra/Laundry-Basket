@@ -963,6 +963,7 @@ export default function AdminDashboard() {
         { Metric: 'Cash Collected (₹)', Value: pnlData.revenue?.cashCollected || 0 },
         { Metric: 'Online Collected (₹)', Value: pnlData.revenue?.onlineCollected || 0 },
         { Metric: 'Total Collected (₹)', Value: pnlData.revenue?.totalCollected || 0 },
+        { Metric: 'Delivery Charges Collected (₹)', Value: pnlData.revenue?.deliveryFeesCollected || 0 },
         { Metric: 'Pending Collection (₹)', Value: pnlData.revenue?.pendingCollection || 0 },
         { Metric: '', Value: '' },
         { Metric: 'OPERATING EXPENSES (OpEx)', Value: '' },
@@ -2599,6 +2600,12 @@ export default function AdminDashboard() {
                           <span>↳ Cash Collected</span>
                           <span>₹{(pnlData.revenue?.cashCollected || 0).toLocaleString('en-IN')}</span>
                         </div>
+                        {(pnlData.revenue?.deliveryFeesCollected || 0) > 0 && (
+                          <div className="flex justify-between py-2 text-sm text-blue-600 font-bold bg-blue-50/50 px-3 rounded-xl">
+                            <span>↳ Delivery Charges Collected</span>
+                            <span>₹{(pnlData.revenue?.deliveryFeesCollected || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-2 text-sm text-amber-600 font-bold bg-amber-50 px-3 rounded-xl">
                           <span>⚠️ Pending Receivables</span>
                           <span>₹{(pnlData.revenue?.pendingCollection || 0).toLocaleString('en-IN')}</span>
@@ -2621,8 +2628,10 @@ export default function AdminDashboard() {
                       <div className="space-y-3">
                         {Object.entries(pnlData.expenses?.opexBreakdown || {}).map(([cat, amt]: any) => (
                           <div key={cat} className="flex justify-between items-center py-2 border-b border-black/5 text-sm">
-                            <span className="text-text-primary font-bold capitalize">
-                              {cat}
+                            <span className="text-text-primary font-bold">
+                              {cat === 'delivery charge pay to 3rd party rider'
+                                ? '🛵 Delivery Charge Pay to 3rd Party Rider'
+                                : <span className="capitalize">{cat}</span>}
                             </span>
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-text-secondary">
@@ -2712,8 +2721,12 @@ export default function AdminDashboard() {
                                 <td className="py-3 px-4 font-mono text-xs">{exp.date}</td>
                                 <td className="py-3 px-4 font-bold text-text-primary">{exp.narration}</td>
                                 <td className="py-3 px-4">
-                                  <span className="px-2.5 py-1 bg-black/5 rounded-full text-[11px] font-bold capitalize">
-                                    {exp.subtype}
+                                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                    exp.subtype === 'delivery charge pay to 3rd party rider'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      : 'bg-black/5'
+                                  } capitalize`}>
+                                    {exp.subtype === 'delivery charge pay to 3rd party rider' ? '🛵 3rd Party Rider Delivery' : exp.subtype}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4">
@@ -2902,6 +2915,7 @@ export default function AdminDashboard() {
                     <option value="chemical">Chemicals & Detergent</option>
                     <option value="packaging">Packaging Material</option>
                     <option value="office expense">Office Expense</option>
+                    <option value="delivery charge pay to 3rd party rider">🛵 Delivery Charge Pay to 3rd Party Rider</option>
                     <option value="advance salary">Staff Advance / Salary</option>
                     <option value="marketing">Marketing & Pamphlets</option>
                     <option value="repairs">Repairs & Plumbing</option>

@@ -2585,6 +2585,7 @@ app.get('/api/pnl', verifyToken, async (req, res) => {
         let pendingCollection = 0;
         let deliveredCount = 0;
         let pendingCount = 0;
+        let deliveryFeesCollected = 0;
 
         const serviceBreakdown = {};
         const dailyBreakdown = {};
@@ -2593,10 +2594,12 @@ app.get('/api/pnl', verifyToken, async (req, res) => {
             const finalAmt = Number(o.received_amount !== undefined && o.received_amount !== null && o.received_amount > 0 ? o.received_amount : (o.final_amount || o.finalAmount || o.totalAmount || o.total || o.amount || 0));
             const totalAmt = Number(o.total || o.totalAmount || o.amount || finalAmt);
             const discAmt = Number(o.discount || 0);
+            const dFee = Number(o.deliveryFee || 0);
 
             grossRevenue += totalAmt;
             totalDiscounts += discAmt;
             netRevenue += finalAmt;
+            deliveryFeesCollected += dFee;
 
             const mode = String(o.paymentMode || o.payment_mode || o.paymentMethod || '').toLowerCase();
             const status = String(o.paymentStatus || o.payment_status || '').toLowerCase();
@@ -2687,6 +2690,7 @@ app.get('/api/pnl', verifyToken, async (req, res) => {
                 pendingCollection,
                 deliveredCount,
                 pendingCount,
+                deliveryFeesCollected,
                 serviceBreakdown,
                 dailyBreakdown
             },
