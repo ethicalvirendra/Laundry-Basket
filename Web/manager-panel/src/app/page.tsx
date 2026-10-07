@@ -2112,23 +2112,28 @@ Thank you for trusting *Laundry Basket*. ❤️
   </div>
 
   <div class="dash"></div>
-  <div class="center" style="margin: 10px 0;">
-    <div class="bold" style="font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">SCAN & PAY VIA UPI</div>
-    <div style="display:flex; justify-content:center; align-items:center; margin: 4px auto;">
-      <img id="qr-img" src="${qrBase64}" style="width:130px;height:130px;object-fit:contain;border-radius:8px;border:1px solid #ccc;padding:2px;" alt="UPI QR" />
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0;">
+    <!-- Left Side: Scan & Pay QR -->
+    <div style="flex: 0 0 46%; text-align: center;">
+      <div class="bold" style="font-size: 9.5px; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 4px; white-space: nowrap;">SCAN & PAY VIA UPI</div>
+      <div style="display:flex; justify-content:center; align-items:center; margin: 2px auto;">
+        <img id="qr-img" src="${qrBase64}" style="width:105px;height:105px;object-fit:contain;border-radius:6px;border:1px solid #ccc;padding:2px;" alt="UPI QR" />
+      </div>
+      <div style="font-size: 8px; color: #444; margin-top: 3px; font-weight: 700; white-space: nowrap;">GPay • PhonePe • UPI</div>
     </div>
-    <div style="font-size: 10px; color: #444; margin-top: 5px; font-weight: 700;">GPay • PhonePe • Paytm • UPI</div>
-  </div>
 
-  <div style="background-color: #dcfce7; padding: 12px; text-align: center; margin: 15px 0; border-radius: 8px;">
-    <div style="font-size: 11px; font-weight: 900; color: #166534; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;">
-      TRACK & BOOK EASILY
-    </div>
-    <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: bold; font-size: 14px; color: #166534;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="3 2 3 22 20 12"></polygon>
-      </svg>
-      Download App from Play Store
+    <!-- Right Side: Track & Book / Download App from Play Store -->
+    <div style="flex: 1; min-width: 0; background-color: #dcfce7; padding: 10px 6px; text-align: center; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 125px; border: 1px solid #bbf7d0;">
+      <div style="font-size: 10px; font-weight: 900; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; line-height: 1.2;">
+        TRACK &amp; BOOK EASILY
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-weight: bold; font-size: 11px; color: #166534; line-height: 1.3;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 2px;">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span>Download App from</span>
+        <span style="font-size: 11.5px; font-weight: 900;">Play Store</span>
+      </div>
     </div>
   </div>
   
@@ -5528,21 +5533,25 @@ Thank you for trusting *Laundry Basket*. ❤️
                   })()}
                 </div>
 
-                {/* UPI QR Payment Block */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-black uppercase text-text-primary tracking-widest mb-2">Scan & Pay via UPI</p>
-                  <img src={PAYMENT_QR_BASE64} alt="UPI QR" className="w-36 h-36 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-sm" />
-                  <p className="text-[9px] font-bold text-text-secondary mt-2">GPay • PhonePe • Paytm • Any UPI App</p>
-                </div>
+                {/* UPI QR Payment Block & Play Store Download Banner (Side-by-Side) */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {/* Left: UPI QR */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                    <p className="text-[9px] font-black uppercase text-text-primary tracking-wider mb-2">Scan &amp; Pay via UPI</p>
+                    <img src={PAYMENT_QR_BASE64} alt="UPI QR" className="w-28 h-28 object-contain bg-white p-1.5 rounded-xl border border-slate-200 shadow-xs" />
+                    <p className="text-[8px] font-bold text-text-secondary mt-2">GPay • PhonePe • UPI</p>
+                  </div>
 
-                {/* Play Store Download Banner */}
-                <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 mb-6 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-black uppercase text-green-700 tracking-widest mb-1">Track & Book easily</p>
-                  <div className="flex items-center justify-center gap-2 text-green-800 font-bold text-sm">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
-                      <polygon points="3 2 3 22 20 12"></polygon>
-                    </svg>
-                    Download App from Play Store
+                  {/* Right: Track & Book / Play Store Download */}
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                    <p className="text-[10px] font-black uppercase text-green-700 tracking-wider mb-2 leading-tight">Track &amp; Book easily</p>
+                    <div className="flex flex-col items-center justify-center gap-1.5 text-green-800 font-bold text-xs">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 mb-1">
+                        <polygon points="3 2 3 22 20 12"></polygon>
+                      </svg>
+                      <span>Download App from</span>
+                      <span className="text-xs font-black">Play Store</span>
+                    </div>
                   </div>
                 </div>
 
