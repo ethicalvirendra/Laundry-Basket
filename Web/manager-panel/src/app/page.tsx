@@ -363,7 +363,9 @@ export default function ManagerPanel() {
     assignedRiderId: '',
     searchQuery: '',
     cx_type: 'Residential',
-    sourceSegment: 'RF'
+    sourceSegment: 'RF',
+    deliveryFee: '0',
+    paidTo3rdPartyRider: false
   });
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -567,10 +569,11 @@ export default function ManagerPanel() {
     setDetectedCustomer(null);
   };
 
-  const recalcTotal = (services: { name: string, price: number, qty: number }[], discountPct: string, totalMode?: string, adjustment?: string) => {
+  const recalcTotal = (services: { name: string, price: number, qty: number }[], discountPct: string, totalMode?: string, adjustment?: string, deliveryFee?: string | number) => {
     const subtotal = services.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
     const disc = parseFloat(discountPct) || 0;
-    let finalTotal = subtotal - (subtotal * disc / 100);
+    const fee = parseFloat(String(deliveryFee || '0')) || 0;
+    let finalTotal = subtotal - (subtotal * disc / 100) + fee;
 
     if (totalMode === 'adjustment') {
       const adj = parseFloat(adjustment || '0') || 0;
@@ -1342,7 +1345,9 @@ export default function ManagerPanel() {
       assignedRiderId: order.assignedRiderId || '',
       searchQuery: '',
       cx_type: order.cx_type || (order.source === 'Business' ? 'Business' : 'Residential'),
-      sourceSegment: order.sourceSegment || (order.source === 'WhatsApp' ? 'SM' : 'RF')
+      sourceSegment: order.sourceSegment || (order.source === 'WhatsApp' ? 'SM' : 'RF'),
+      deliveryFee: String(order.deliveryFee ?? order.delivery_charges ?? '0'),
+      paidTo3rdPartyRider: !!order.paidTo3rdPartyRider
     });
     setShowEditOrderModal(true);
   };
@@ -1358,7 +1363,7 @@ export default function ManagerPanel() {
 
       let finalTotal = parseFloat(editOrderForm.total) || 0;
       if (editOrderForm.totalMode === 'auto' || editOrderForm.totalMode === 'adjustment') {
-        finalTotal = parseFloat(recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment)) || 0;
+        finalTotal = parseFloat(recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee)) || 0;
       }
 
       const subtotal = editOrderForm.selectedServices.reduce((acc: number, curr: any) => acc + curr.price * curr.qty, 0);
@@ -1378,6 +1383,8 @@ export default function ManagerPanel() {
         total: finalTotal,
         subtotal: subtotal,
         discount: editOrderForm.discount,
+        deliveryFee: parseFloat(editOrderForm.deliveryFee || '0') || 0,
+        paidTo3rdPartyRider: !!editOrderForm.paidTo3rdPartyRider,
         totalMode: editOrderForm.totalMode,
         adjustment: editOrderForm.adjustment,
         status: editOrderForm.status,
@@ -5024,7 +5031,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                             setEditOrderForm({ 
                               ...editOrderForm, 
                               selectedServices: newList, 
-                              total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment), 
+                              total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee), 
                               searchQuery: '' 
                             });
                           }}
@@ -5057,7 +5064,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                         setEditOrderForm({
                           ...editOrderForm,
                           selectedServices: newList,
-                          total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment),
+                          total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee),
                           searchQuery: ''
                         });
                       }}
@@ -5111,7 +5118,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                                   setEditOrderForm({
                                     ...editOrderForm,
                                     selectedServices: newList,
-                                    total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment)
+                                    total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee)
                                   });
                                 }}
                               />
@@ -5126,10 +5133,10 @@ Thank you for trusting *Laundry Basket*. ❤️
                                   let newList = [...editOrderForm.selectedServices];
                                   if (newList[idx].qty > 1) {
                                     newList[idx].qty -= 1;
-                                    setEditOrderForm({ ...editOrderForm, selectedServices: newList, total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment) });
+                                    setEditOrderForm({ ...editOrderForm, selectedServices: newList, total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee) });
                                   } else {
                                     const filteredList = newList.filter((_, i) => i !== idx);
-                                    setEditOrderForm({ ...editOrderForm, selectedServices: filteredList, total: recalcTotal(filteredList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment) });
+                                    setEditOrderForm({ ...editOrderForm, selectedServices: filteredList, total: recalcTotal(filteredList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee) });
                                   }
                                 }}
                               >-</button>
@@ -5139,7 +5146,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                                 onClick={() => {
                                   let newList = [...editOrderForm.selectedServices];
                                   newList[idx].qty += 1;
-                                  setEditOrderForm({ ...editOrderForm, selectedServices: newList, total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment) });
+                                  setEditOrderForm({ ...editOrderForm, selectedServices: newList, total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee) });
                                 }}
                               >+</button>
                             </div>
@@ -5153,6 +5160,44 @@ Thank you for trusting *Laundry Basket*. ❤️
 
                 {/* Pricing & Adjustments */}
                 <div className="mt-4 space-y-3 pt-3 border-t border-black/5">
+                  {/* Delivery Charges & 3rd Party Rider (On top of Discount) */}
+                  <div className="bg-primary/5 border border-primary/10 rounded-2xl p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase text-primary tracking-wider">
+                        Delivery Charges (₹)
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editOrderForm.paidTo3rdPartyRider}
+                          onChange={e => setEditOrderForm({ ...editOrderForm, paidTo3rdPartyRider: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                        />
+                        <span className="text-[11px] font-bold text-gray-700">
+                          Paid to 3rd party rider
+                        </span>
+                      </label>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full bg-white border border-black/10 rounded-xl pl-8 pr-4 py-2 outline-none focus:border-primary transition-colors font-bold text-sm text-gray-900"
+                        placeholder="0"
+                        value={editOrderForm.deliveryFee}
+                        onChange={e => {
+                          const fee = e.target.value;
+                          setEditOrderForm({
+                            ...editOrderForm,
+                            deliveryFee: fee,
+                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, fee)
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black uppercase text-text-secondary ml-1">Discount (%)</label>
@@ -5167,7 +5212,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                           setEditOrderForm({
                             ...editOrderForm,
                             discount: d,
-                            total: recalcTotal(editOrderForm.selectedServices, d, editOrderForm.totalMode, editOrderForm.adjustment)
+                            total: recalcTotal(editOrderForm.selectedServices, d, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee)
                           });
                         }}
                       />
@@ -5181,7 +5226,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                           setEditOrderForm({
                             ...editOrderForm,
                             totalMode: mode,
-                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, mode, editOrderForm.adjustment)
+                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, mode, editOrderForm.adjustment, editOrderForm.deliveryFee)
                           });
                         }}
                         className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-xs font-bold"
@@ -5206,7 +5251,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                           setEditOrderForm({
                             ...editOrderForm,
                             adjustment: adj,
-                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, 'adjustment', adj)
+                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, 'adjustment', adj, editOrderForm.deliveryFee)
                           });
                         }}
                       />
@@ -5230,7 +5275,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                   <div className="flex justify-between items-center bg-primary/10 rounded-2xl px-5 py-4 border border-primary/20">
                     <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary">Updated Total</span>
                     <span className="text-3xl font-black text-primary">₹{
-                      editOrderForm.totalMode === 'manual' ? editOrderForm.total : recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment)
+                      editOrderForm.totalMode === 'manual' ? editOrderForm.total : recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee)
                     }</span>
                   </div>
                 </div>

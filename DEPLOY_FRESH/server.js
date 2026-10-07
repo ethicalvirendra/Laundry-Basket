@@ -583,6 +583,7 @@ const OrderSchema = new mongoose.Schema({
     redeemedPoints: { type: Number, default: 0 },
     originStoreId: { type: String, default: null },
     virtualBranch: { type: String, default: null },
+    paidTo3rdPartyRider: { type: Boolean, default: false },
     managerConfirmedAmount: { type: Boolean, default: false },
     amountChangeReason: { type: String, default: null }
 });
