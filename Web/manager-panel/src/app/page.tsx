@@ -415,6 +415,14 @@ export default function ManagerPanel() {
   const [historyLimit, setHistoryLimit] = useState(25);
   const [historySourceFilter, setHistorySourceFilter] = useState<'All' | 'NP' | 'SM' | 'RF' | 'WS' | 'AP'>('All');
 
+  // Column filter states for Order History
+  const [historyAccountTypeFilter, setHistoryAccountTypeFilter] = useState<string>('All');
+  const [historyServiceFilter, setHistoryServiceFilter] = useState<string>('All');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>('All');
+  const [historyPaymentStatusFilter, setHistoryPaymentStatusFilter] = useState<string>('All');
+  const [historyPaymentModeFilter, setHistoryPaymentModeFilter] = useState<string>('All');
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
+
   // States for dedicated Source Analytics & Tracking Tab
   const [sourceTabActiveSource, setSourceTabActiveSource] = useState<'All' | 'NP' | 'SM' | 'RF' | 'WS' | 'AP'>('All');
   const [sourceTabSearch, setSourceTabSearch] = useState('');
@@ -2607,14 +2615,133 @@ Thank you for trusting *Laundry Basket*. ❤️
                         📱 Customer App AP ({apCount})
                       </button>
                     </div>
-                    {historySourceFilter !== 'All' && (
-                      <button
-                        onClick={() => { setHistorySourceFilter('All'); setHistoryPage(1); }}
-                        className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
-                      >
-                        Reset Filter ✕
-                      </button>
-                    )}
+                    {/* Column Filters Toolbar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white/60 glass p-3.5 rounded-2xl border border-black/5 mb-4 shadow-xs">
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="text-[11px] font-black uppercase text-text-secondary tracking-wider flex items-center gap-1 mr-1">
+                          🔍 Filters:
+                        </span>
+
+                        {/* Account Type Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Type:</span>
+                          <select
+                            value={historyAccountTypeFilter}
+                            onChange={(e) => { setHistoryAccountTypeFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Types</option>
+                            <option value="Residential">Residential</option>
+                            <option value="Business">Business</option>
+                          </select>
+                        </div>
+
+                        {/* Service Type Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Service:</span>
+                          <select
+                            value={historyServiceFilter}
+                            onChange={(e) => { setHistoryServiceFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Services</option>
+                            <option value="Wash & Iron">Wash & Iron</option>
+                            <option value="Dry Clean">Dry Clean</option>
+                            <option value="Steam Iron">Steam Iron / Ironing</option>
+                            <option value="Wash Only">Wash Only</option>
+                          </select>
+                        </div>
+
+                        {/* Status Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Status:</span>
+                          <select
+                            value={historyStatusFilter}
+                            onChange={(e) => { setHistoryStatusFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Statuses</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Pickup done">Pickup Done</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </div>
+
+                        {/* Payment Status Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Payment:</span>
+                          <select
+                            value={historyPaymentStatusFilter}
+                            onChange={(e) => { setHistoryPaymentStatusFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Payments</option>
+                            <option value="Received">Received</option>
+                            <option value="Pending">Pending</option>
+                          </select>
+                        </div>
+
+                        {/* Payment Mode Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Mode:</span>
+                          <select
+                            value={historyPaymentModeFilter}
+                            onChange={(e) => { setHistoryPaymentModeFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Modes</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Online QR">Online QR</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Card">Card</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Not Set">Not Set</option>
+                          </select>
+                        </div>
+
+                        {/* Order Date Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Date:</span>
+                          <input
+                            type="date"
+                            value={historyDateFilter}
+                            onChange={(e) => { setHistoryDateFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          />
+                          {historyDateFilter && (
+                            <button
+                              onClick={() => { setHistoryDateFilter(''); setHistoryPage(1); }}
+                              className="text-[10px] text-red-500 font-bold hover:text-red-700 ml-1"
+                              title="Clear Date"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Clear All Column Filters */}
+                      {(historyAccountTypeFilter !== 'All' || historyServiceFilter !== 'All' || historyStatusFilter !== 'All' || historyPaymentStatusFilter !== 'All' || historyPaymentModeFilter !== 'All' || historyDateFilter !== '' || orderSearch !== '' || historySourceFilter !== 'All') && (
+                        <button
+                          onClick={() => {
+                            setHistoryAccountTypeFilter('All');
+                            setHistoryServiceFilter('All');
+                            setHistoryStatusFilter('All');
+                            setHistoryPaymentStatusFilter('All');
+                            setHistoryPaymentModeFilter('All');
+                            setHistoryDateFilter('');
+                            setOrderSearch('');
+                            setHistorySourceFilter('All');
+                            setHistoryPage(1);
+                          }}
+                          className="text-[11px] font-black text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                        >
+                          Reset All Filters ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
@@ -2631,16 +2758,102 @@ Thank you for trusting *Laundry Basket*. ❤️
                     <tr className="border-b-2 border-black/5 text-[9px] font-black uppercase tracking-widest text-text-secondary">
                       <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Customer ID</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">CX Name</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">Account Type</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5">
+                        <div className="flex items-center gap-1">
+                          <span>Account Type</span>
+                          <select
+                            value={historyAccountTypeFilter}
+                            onChange={(e) => { setHistoryAccountTypeFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer"
+                            title="Filter Account Type"
+                          >
+                            <option value="All">All</option>
+                            <option value="Residential">Res</option>
+                            <option value="Business">Biz</option>
+                          </select>
+                        </div>
+                      </th>
                       <th className="px-4 py-3 whitespace-nowrap bg-blue-500/5 border-r border-black/8">Mobile No.</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Order Date</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">
+                        <div className="flex items-center gap-1">
+                          <span>Order Date</span>
+                          {historyDateFilter && (
+                            <span className="w-2 h-2 rounded-full bg-violet-600" title={`Filtered: ${historyDateFilter}`}></span>
+                          )}
+                        </div>
+                      </th>
                       <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Items Ordered</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Qty</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">Service Type</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5 border-r border-black/8">Status</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5">
+                        <div className="flex items-center gap-1">
+                          <span>Service Type</span>
+                          <select
+                            value={historyServiceFilter}
+                            onChange={(e) => { setHistoryServiceFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer max-w-[80px]"
+                            title="Filter Service"
+                          >
+                            <option value="All">All</option>
+                            <option value="Wash & Iron">Wash & Iron</option>
+                            <option value="Dry Clean">Dry Clean</option>
+                            <option value="Steam Iron">Ironing</option>
+                            <option value="Wash Only">Wash Only</option>
+                          </select>
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-violet-500/5 border-r border-black/8">
+                        <div className="flex items-center gap-1">
+                          <span>Status</span>
+                          <select
+                            value={historyStatusFilter}
+                            onChange={(e) => { setHistoryStatusFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer max-w-[80px]"
+                            title="Filter Status"
+                          >
+                            <option value="All">All</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Pickup done">Pickup Done</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </div>
+                      </th>
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Total Amount</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Payment Status</th>
-                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5 border-r border-black/8">Mode</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">
+                        <div className="flex items-center gap-1">
+                          <span>Payment Status</span>
+                          <select
+                            value={historyPaymentStatusFilter}
+                            onChange={(e) => { setHistoryPaymentStatusFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer"
+                            title="Filter Payment Status"
+                          >
+                            <option value="All">All</option>
+                            <option value="Received">Received</option>
+                            <option value="Pending">Pending</option>
+                          </select>
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5 border-r border-black/8">
+                        <div className="flex items-center gap-1">
+                          <span>Mode</span>
+                          <select
+                            value={historyPaymentModeFilter}
+                            onChange={(e) => { setHistoryPaymentModeFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer max-w-[70px]"
+                            title="Filter Mode"
+                          >
+                            <option value="All">All</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Online QR">Online QR</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Card">Card</option>
+                            <option value="Bank Transfer">Bank</option>
+                            <option value="Not Set">Not Set</option>
+                          </select>
+                        </div>
+                      </th>
                       <th className="px-4 py-3 whitespace-nowrap bg-red-500/5">Action</th>
                     </tr>
                   </thead>
@@ -2674,7 +2887,79 @@ Thank you for trusting *Laundry Basket*. ❤️
                           if (seg !== historySourceFilter) return false;
                         }
 
-                        // 2. Query Search Check
+                        // 2. Account Type Filter Check
+                        if (historyAccountTypeFilter !== 'All') {
+                          const cxType = o.cx_type || (o.source === 'Business' ? 'Business' : 'Residential');
+                          if (cxType.toLowerCase() !== historyAccountTypeFilter.toLowerCase()) return false;
+                        }
+
+                        // 3. Service Type Filter Check
+                        if (historyServiceFilter !== 'All') {
+                          const servStr = (o.service_type || (Array.isArray(o.services) ? o.services.join(' ') : String(o.services || ''))).toLowerCase();
+                          if (historyServiceFilter === 'Wash & Iron') {
+                            if (!servStr.includes('wash') || !servStr.includes('iron')) return false;
+                          } else if (historyServiceFilter === 'Dry Clean') {
+                            if (!servStr.includes('dry') && !servStr.includes('clean')) return false;
+                          } else if (historyServiceFilter === 'Steam Iron') {
+                            if (!servStr.includes('iron') && !servStr.includes('steam')) return false;
+                          } else if (historyServiceFilter === 'Wash Only') {
+                            if (!servStr.includes('wash')) return false;
+                          } else if (!servStr.includes(historyServiceFilter.toLowerCase())) {
+                            return false;
+                          }
+                        }
+
+                        // 4. Status Filter Check
+                        if (historyStatusFilter !== 'All') {
+                          const st = (o.status || 'Pending').toLowerCase();
+                          const targetSt = historyStatusFilter.toLowerCase();
+                          if (targetSt === 'delivered') {
+                            if (!st.includes('deliver') && !st.includes('complete')) return false;
+                          } else if (!st.includes(targetSt)) {
+                            return false;
+                          }
+                        }
+
+                        // 5. Payment Status Filter Check
+                        if (historyPaymentStatusFilter !== 'All') {
+                          const rawPaySt = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                          const paySt = String(rawPaySt).toLowerCase().includes('received') ? 'Received' : 'Pending';
+                          if (paySt !== historyPaymentStatusFilter) return false;
+                        }
+
+                        // 6. Payment Mode Filter Check
+                        if (historyPaymentModeFilter !== 'All') {
+                          const rawPaySt = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                          const paySt = String(rawPaySt).toLowerCase().includes('received') ? 'Received' : 'Pending';
+                          const payMode = o.paymentMode || o.payment_mode || (paySt === 'Received' ? 'Cash' : 'Not Set');
+                          if (payMode.toLowerCase() !== historyPaymentModeFilter.toLowerCase()) return false;
+                        }
+
+                        // 7. Order Date Filter Check
+                        if (historyDateFilter) {
+                          const oDate = String(o.order_date || (o.timestamp ? o.timestamp.split(',')[0] : '')).trim();
+                          // Support YYYY-MM-DD input comparison against DD/MM/YYYY or YYYY-MM-DD or readable strings
+                          let dateMatches = false;
+                          if (oDate.includes(historyDateFilter)) {
+                            dateMatches = true;
+                          } else {
+                            const [y, m, d] = historyDateFilter.split('-');
+                            if (d && m && y) {
+                              const dInt = parseInt(d, 10);
+                              const mInt = parseInt(m, 10);
+                              // e.g. 15/01/2026 or 15/1/2026 or 15-01-2026
+                              const pattern1 = `${d}/${m}/${y}`;
+                              const pattern2 = `${dInt}/${mInt}/${y}`;
+                              const pattern3 = `${d}-${m}-${y}`;
+                              if (oDate.includes(pattern1) || oDate.includes(pattern2) || oDate.includes(pattern3)) {
+                                dateMatches = true;
+                              }
+                            }
+                          }
+                          if (!dateMatches) return false;
+                        }
+
+                        // 8. Query Search Check
                         if (!query) return true;
                         const servicesMatch = o.services ? (Array.isArray(o.services) ? o.services.some((s: string) => s.toLowerCase().includes(query)) : String(o.services).toLowerCase().includes(query)) : false;
                         return (
@@ -2861,6 +3146,83 @@ Thank you for trusting *Laundry Basket*. ❤️
               {(() => {
                 const query = orderSearch.toLowerCase();
                 const filtered = categorizedOrders.history.filter((o: any) => {
+                  // 1. Source Filter Check
+                  if (historySourceFilter !== 'All') {
+                    const seg = o.sourceSegment || (o.source === 'WhatsApp' ? 'SM' : o.source === 'App' ? 'AP' : o.source === 'Walk-in' ? 'RF' : o.source === 'Web' ? 'WS' : 'RF');
+                    if (seg !== historySourceFilter) return false;
+                  }
+
+                  // 2. Account Type Filter Check
+                  if (historyAccountTypeFilter !== 'All') {
+                    const cxType = o.cx_type || (o.source === 'Business' ? 'Business' : 'Residential');
+                    if (cxType.toLowerCase() !== historyAccountTypeFilter.toLowerCase()) return false;
+                  }
+
+                  // 3. Service Type Filter Check
+                  if (historyServiceFilter !== 'All') {
+                    const servStr = (o.service_type || (Array.isArray(o.services) ? o.services.join(' ') : String(o.services || ''))).toLowerCase();
+                    if (historyServiceFilter === 'Wash & Iron') {
+                      if (!servStr.includes('wash') || !servStr.includes('iron')) return false;
+                    } else if (historyServiceFilter === 'Dry Clean') {
+                      if (!servStr.includes('dry') && !servStr.includes('clean')) return false;
+                    } else if (historyServiceFilter === 'Steam Iron') {
+                      if (!servStr.includes('iron') && !servStr.includes('steam')) return false;
+                    } else if (historyServiceFilter === 'Wash Only') {
+                      if (!servStr.includes('wash')) return false;
+                    } else if (!servStr.includes(historyServiceFilter.toLowerCase())) {
+                      return false;
+                    }
+                  }
+
+                  // 4. Status Filter Check
+                  if (historyStatusFilter !== 'All') {
+                    const st = (o.status || 'Pending').toLowerCase();
+                    const targetSt = historyStatusFilter.toLowerCase();
+                    if (targetSt === 'delivered') {
+                      if (!st.includes('deliver') && !st.includes('complete')) return false;
+                    } else if (!st.includes(targetSt)) {
+                      return false;
+                    }
+                  }
+
+                  // 5. Payment Status Filter Check
+                  if (historyPaymentStatusFilter !== 'All') {
+                    const rawPaySt = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                    const paySt = String(rawPaySt).toLowerCase().includes('received') ? 'Received' : 'Pending';
+                    if (paySt !== historyPaymentStatusFilter) return false;
+                  }
+
+                  // 6. Payment Mode Filter Check
+                  if (historyPaymentModeFilter !== 'All') {
+                    const rawPaySt = o.paymentStatus || o.payment_status || (Number(o.pending_amount || 0) > 0 ? 'Pending' : (Number(o.received_amount || 0) > 0 ? 'Received' : 'Pending'));
+                    const paySt = String(rawPaySt).toLowerCase().includes('received') ? 'Received' : 'Pending';
+                    const payMode = o.paymentMode || o.payment_mode || (paySt === 'Received' ? 'Cash' : 'Not Set');
+                    if (payMode.toLowerCase() !== historyPaymentModeFilter.toLowerCase()) return false;
+                  }
+
+                  // 7. Order Date Filter Check
+                  if (historyDateFilter) {
+                    const oDate = String(o.order_date || (o.timestamp ? o.timestamp.split(',')[0] : '')).trim();
+                    let dateMatches = false;
+                    if (oDate.includes(historyDateFilter)) {
+                      dateMatches = true;
+                    } else {
+                      const [y, m, d] = historyDateFilter.split('-');
+                      if (d && m && y) {
+                        const dInt = parseInt(d, 10);
+                        const mInt = parseInt(m, 10);
+                        const pattern1 = `${d}/${m}/${y}`;
+                        const pattern2 = `${dInt}/${mInt}/${y}`;
+                        const pattern3 = `${d}-${m}-${y}`;
+                        if (oDate.includes(pattern1) || oDate.includes(pattern2) || oDate.includes(pattern3)) {
+                          dateMatches = true;
+                        }
+                      }
+                    }
+                    if (!dateMatches) return false;
+                  }
+
+                  // 8. Query Search Check
                   if (!query) return true;
                   const servicesMatch = o.services ? (Array.isArray(o.services) ? o.services.some((s: string) => s.toLowerCase().includes(query)) : String(o.services).toLowerCase().includes(query)) : false;
                   return (
@@ -2875,7 +3237,9 @@ Thank you for trusting *Laundry Basket*. ❤️
                     servicesMatch ||
                     (o.order_date && String(o.order_date).toLowerCase().includes(query)) ||
                     (o.status && o.status.toLowerCase().includes(query)) ||
-                    (o.timestamp && String(o.timestamp).toLowerCase().includes(query))
+                    (o.timestamp && String(o.timestamp).toLowerCase().includes(query)) ||
+                    (o.source && String(o.source).toLowerCase().includes(query)) ||
+                    (o.sourceSegment && String(o.sourceSegment).toLowerCase().includes(query))
                   );
                 });
                 const totalRows = filtered.length;
