@@ -423,6 +423,7 @@ export default function ManagerPanel() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<string>('All');
   const [historyPaymentStatusFilter, setHistoryPaymentStatusFilter] = useState<string>('All');
   const [historyPaymentModeFilter, setHistoryPaymentModeFilter] = useState<string>('All');
+  const [historyDeliveryFilter, setHistoryDeliveryFilter] = useState<string>('All');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
 
   // States for dedicated Source Analytics & Tracking Tab
@@ -1276,6 +1277,8 @@ export default function ManagerPanel() {
         'Address': o.address || '-',
         'Services': Array.isArray(o.services) ? o.services.join(', ') : o.services || o.items_ordered || '-',
         'Total Amount (₹)': Number(o.total) || 0,
+        'Delivery Charges (₹)': Number(o.deliveryFee || o.delivery_charges || 0),
+        'Paid to 3rd Party Rider': o.paidTo3rdPartyRider ? 'Yes' : 'No',
         'Payment Status': o.paymentStatus || o.payment_status || 'Pending',
         'Payment Mode': o.paymentMode || o.payment_mode || '-',
         'Order Status': o.status || 'Pending',
@@ -2534,24 +2537,46 @@ Thank you for trusting *Laundry Basket*. ❤️
               </div>
 
               {/* Summary KPI Strip */}
-              <div className="manager-kpi-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <div className="glass-card p-4 border-primary/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Total Orders</p>
-                  <p className="text-2xl font-black text-text-primary">{orderSummary.totalOrders.toLocaleString('en-IN')}</p>
-                </div>
-                <div className="glass-card p-4 border-orange-500/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Pending Payments</p>
-                  <p className="text-2xl font-black text-orange-500">₹{orderSummary.pendingPayments.toLocaleString('en-IN')}</p>
-                </div>
-                <div className="glass-card p-4 border-green-500/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Received Amount</p>
-                  <p className="text-2xl font-black text-green-600">₹{orderSummary.receivedAmount.toLocaleString('en-IN')}</p>
-                </div>
-                <div className="glass-card p-4 border-red-500/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">High Risk Orders</p>
-                  <p className="text-2xl font-black text-red-500">{orderSummary.highRiskOrders.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
+              {(() => {
+                const historyOrders = categorizedOrders.history || [];
+                const totalDeliveryCharges = historyOrders.reduce((sum: number, o: any) => sum + (Number(o.deliveryFee || o.delivery_charges || 0)), 0);
+                const thirdPartyCount = historyOrders.filter((o: any) => !!o.paidTo3rdPartyRider).length;
+                const thirdPartyCharges = historyOrders.reduce((sum: number, o: any) => o.paidTo3rdPartyRider ? sum + (Number(o.deliveryFee || o.delivery_charges || 0)) : sum, 0);
+
+                return (
+                  <div className="manager-kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+                    <div className="glass-card p-3.5 border-primary/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Total Orders</p>
+                      <p className="text-xl font-black text-text-primary">{orderSummary.totalOrders.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-orange-500/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Pending Payments</p>
+                      <p className="text-xl font-black text-orange-500">₹{orderSummary.pendingPayments.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-green-500/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Received Amount</p>
+                      <p className="text-xl font-black text-green-600">₹{orderSummary.receivedAmount.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-blue-500/10 bg-blue-500/[0.02]">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-700">🚚 Delivery Charges</p>
+                      </div>
+                      <p className="text-xl font-black text-blue-700">₹{totalDeliveryCharges.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-purple-500/10 bg-purple-500/[0.02]">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-purple-700">🛵 Paid to 3rd Party</p>
+                        <span className="text-[8px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded-full">{thirdPartyCount} orders</span>
+                      </div>
+                      <p className="text-xl font-black text-purple-700">₹{thirdPartyCharges.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-red-500/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">High Risk Orders</p>
+                      <p className="text-xl font-black text-red-500">{orderSummary.highRiskOrders.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Marketing Acquisition Source Breakdown Strip */}
               {(() => {
@@ -2713,6 +2738,21 @@ Thank you for trusting *Laundry Basket*. ❤️
                           </select>
                         </div>
 
+                        {/* Delivery Charges / 3rd Party Filter */}
+                        <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
+                          <span className="text-[10px] font-bold text-text-secondary">Delivery:</span>
+                          <select
+                            value={historyDeliveryFilter}
+                            onChange={(e) => { setHistoryDeliveryFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-transparent text-[11px] font-black text-text-primary outline-none cursor-pointer"
+                          >
+                            <option value="All">All Deliveries</option>
+                            <option value="HasDelivery">With Delivery Charge</option>
+                            <option value="ThirdParty">🛵 Paid to 3rd Party</option>
+                            <option value="StorePickup">Free / No Delivery Charge</option>
+                          </select>
+                        </div>
+
                         {/* Order Date Filter */}
                         <div className="flex items-center gap-1 bg-white/80 border border-black/10 rounded-xl px-2.5 py-1.5 shadow-xs">
                           <span className="text-[10px] font-bold text-text-secondary">Date:</span>
@@ -2735,7 +2775,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                       </div>
 
                       {/* Clear All Column Filters */}
-                      {(historyAccountTypeFilter !== 'All' || historyServiceFilter !== 'All' || historyStatusFilter !== 'All' || historyPaymentStatusFilter !== 'All' || historyPaymentModeFilter !== 'All' || historyDateFilter !== '' || orderSearch !== '' || historySourceFilter !== 'All') && (
+                      {(historyAccountTypeFilter !== 'All' || historyServiceFilter !== 'All' || historyStatusFilter !== 'All' || historyPaymentStatusFilter !== 'All' || historyPaymentModeFilter !== 'All' || historyDeliveryFilter !== 'All' || historyDateFilter !== '' || orderSearch !== '' || historySourceFilter !== 'All') && (
                         <button
                           onClick={() => {
                             setHistoryAccountTypeFilter('All');
@@ -2743,6 +2783,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                             setHistoryStatusFilter('All');
                             setHistoryPaymentStatusFilter('All');
                             setHistoryPaymentModeFilter('All');
+                            setHistoryDeliveryFilter('All');
                             setHistoryDateFilter('');
                             setOrderSearch('');
                             setHistorySourceFilter('All');
@@ -2764,7 +2805,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                     <tr className="text-[8px] font-black uppercase tracking-widest">
                       <th colSpan={4} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
                       <th colSpan={5} className="px-4 pt-4 pb-2 bg-violet-500/10 text-violet-700 border-r-2 border-white/60 text-center">📦 Order &amp; Item Details</th>
-                      <th colSpan={3} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Payment &amp; Amount</th>
+                      <th colSpan={4} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Payment &amp; Amount</th>
                       <th colSpan={1} className="px-4 pt-4 pb-2 bg-red-500/10 text-red-700 text-center">⚡ Actions</th>
                     </tr>
                     <tr className="border-b-2 border-black/5 text-[9px] font-black uppercase tracking-widest text-text-secondary">
@@ -2834,6 +2875,22 @@ Thank you for trusting *Laundry Basket*. ❤️
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Total Amount</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">
                         <div className="flex items-center gap-1">
+                          <span>Delivery Fee</span>
+                          <select
+                            value={historyDeliveryFilter}
+                            onChange={(e) => { setHistoryDeliveryFilter(e.target.value); setHistoryPage(1); }}
+                            className="bg-white/80 border border-black/10 rounded px-1 py-0.5 text-[8.5px] font-black text-text-primary outline-none cursor-pointer max-w-[65px]"
+                            title="Filter Delivery Charge"
+                          >
+                            <option value="All">All</option>
+                            <option value="HasDelivery">₹ Fee</option>
+                            <option value="ThirdParty">🛵 3rd Pty</option>
+                            <option value="StorePickup">Free</option>
+                          </select>
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">
+                        <div className="flex items-center gap-1">
                           <span>Payment Status</span>
                           <select
                             value={historyPaymentStatusFilter}
@@ -2884,6 +2941,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
+                            <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-24"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-20"></div></td>
                             <td className="px-4 py-3"><div className="h-4 bg-black/10 rounded w-16"></div></td>
@@ -2947,6 +3005,15 @@ Thank you for trusting *Laundry Basket*. ❤️
                           if (payMode.toLowerCase() !== historyPaymentModeFilter.toLowerCase()) return false;
                         }
 
+                        // 6b. Delivery Charges & 3rd Party Filter Check
+                        if (historyDeliveryFilter !== 'All') {
+                          const delFee = Number(o.deliveryFee || o.delivery_charges || 0);
+                          const is3rdParty = !!o.paidTo3rdPartyRider;
+                          if (historyDeliveryFilter === 'HasDelivery' && delFee <= 0) return false;
+                          if (historyDeliveryFilter === 'ThirdParty' && !is3rdParty) return false;
+                          if (historyDeliveryFilter === 'StorePickup' && delFee > 0) return false;
+                        }
+
                         // 7. Order Date Filter Check
                         if (historyDateFilter) {
                           const oDate = String(o.order_date || (o.timestamp ? o.timestamp.split(',')[0] : '')).trim();
@@ -2992,7 +3059,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                         );
                       });
                       if (filtered.length === 0) return (
-                        <tr><td colSpan={13} className="px-4 py-16 text-center text-text-secondary font-black uppercase tracking-widest text-xs">No orders found matching your search</td></tr>
+                        <tr><td colSpan={14} className="px-4 py-16 text-center text-text-secondary font-black uppercase tracking-widest text-xs">No orders found matching your search</td></tr>
                       );
 
                       const totalRows = filtered.length;
@@ -3108,6 +3175,22 @@ Thank you for trusting *Laundry Basket*. ❤️
                               <span className="text-xs font-black text-emerald-800 tracking-tight">₹{orderTotal.toLocaleString('en-IN')}</span>
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
+                              <div className="flex flex-col gap-0.5 items-start">
+                                {Number(o.deliveryFee || o.delivery_charges || 0) > 0 ? (
+                                  <span className="text-xs font-black text-blue-700">
+                                    ₹{Number(o.deliveryFee || o.delivery_charges).toLocaleString('en-IN')}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-gray-400">₹0</span>
+                                )}
+                                {o.paidTo3rdPartyRider && (
+                                  <span className="text-[7.5px] font-black uppercase px-1.5 py-0.2 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                                    🛵 3rd Party
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
                               <div className="inline-flex rounded-xl border border-black/5 bg-white/60 p-1">
                                 {(['Pending', 'Received'] as const).map(option => (
                                   <button
@@ -3210,6 +3293,15 @@ Thank you for trusting *Laundry Basket*. ❤️
                     const paySt = String(rawPaySt).toLowerCase().includes('received') ? 'Received' : 'Pending';
                     const payMode = o.paymentMode || o.payment_mode || (paySt === 'Received' ? 'Cash' : 'Not Set');
                     if (payMode.toLowerCase() !== historyPaymentModeFilter.toLowerCase()) return false;
+                  }
+
+                  // 6b. Delivery Charges & 3rd Party Filter Check
+                  if (historyDeliveryFilter !== 'All') {
+                    const delFee = Number(o.deliveryFee || o.delivery_charges || 0);
+                    const is3rdParty = !!o.paidTo3rdPartyRider;
+                    if (historyDeliveryFilter === 'HasDelivery' && delFee <= 0) return false;
+                    if (historyDeliveryFilter === 'ThirdParty' && !is3rdParty) return false;
+                    if (historyDeliveryFilter === 'StorePickup' && delFee > 0) return false;
                   }
 
                   // 7. Order Date Filter Check
