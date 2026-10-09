@@ -1,6 +1,6 @@
 {
   "name": "laundry-basket-root",
-  "version": "1.2.1",
+  "version": "6.0.0",
   "private": true,
   "scripts": {
     "build": "node build_wrapper.js"

@@ -7,9 +7,9 @@ const DEPLOY = path.join(ROOT, 'DEPLOY_FRESH');
 const FINAL_DIR = path.join(ROOT, 'FINAL_BUILDS');
 
 const TARGETS = [
-  path.join(FINAL_DIR, 'laundry_deploy_v5.0.0.zip'),
+  path.join(FINAL_DIR, 'laundry_deploy_v6.0.0.zip'),
   path.join(FINAL_DIR, 'DEPLOYMENT_FINAL.zip'),
-  path.join(FINAL_DIR, 'DEPLOYMENT_v5.0.0.zip'),
+  path.join(FINAL_DIR, 'DEPLOYMENT_v6.0.0.zip'),
   path.join(ROOT, 'DEPLOYMENT_FINAL.zip')
 ];
 

@@ -2069,7 +2069,7 @@ Thank you for trusting *Laundry Basket*. ❤️
     if (!w) return;
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Receipt-${order.id} (v5.0.0)</title>
+<title>Receipt-${order.id} (v6.0.0)</title>
 <style>
   @page { size: 80mm auto; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }

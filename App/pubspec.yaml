@@ -1,0 +1,59 @@
+name: laundry_basket_app
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 6.0.0+16
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.1.0
+  glassmorphism: ^3.0.0
+  shared_preferences: ^2.3.2
+  url_launcher: ^6.3.1
+  geolocator: ^10.1.0
+  google_maps_flutter: ^2.5.3
+  permission_handler: ^11.3.1
+  socket_io_client: ^3.1.0
+  connectivity_plus: ^7.1.1
+  firebase_core: ^4.7.0
+  image_picker: ^1.1.2
+  firebase_messaging: ^16.2.0
+  firebase_analytics: ^12.3.0
+  firebase_crashlytics: ^5.2.0
+  google_fonts: ^6.2.1
+  geocoding: ^4.0.0
+  shimmer: ^3.0.0
+  flutter_local_notifications: ^18.0.0
+  video_player: ^2.11.1
+  google_sign_in: ^6.2.1
+  vibration: ^2.0.0
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/google_logo.png
+    - assets/login_hero.png
+    - assets/icon/app_icon.png
