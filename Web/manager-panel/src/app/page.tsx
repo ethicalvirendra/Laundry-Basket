@@ -5314,41 +5314,45 @@ Thank you for trusting *Laundry Basket*. ❤️
 
                 {/* Pricing & Adjustments */}
                 <div className="mt-4 space-y-3 pt-3 border-t border-black/5">
-                  {/* Delivery Charges & 3rd Party Rider (On top of Discount) */}
-                  <div className="bg-primary/5 border border-primary/10 rounded-2xl p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black uppercase text-primary tracking-wider">
-                        Delivery Charges (₹)
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={editOrderForm.paidTo3rdPartyRider}
-                          onChange={e => setEditOrderForm({ ...editOrderForm, paidTo3rdPartyRider: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
-                        />
-                        <span className="text-[11px] font-bold text-gray-700">
-                          Paid to 3rd party rider
-                        </span>
-                      </label>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</span>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full bg-white border border-black/10 rounded-xl pl-8 pr-4 py-2 outline-none focus:border-primary transition-colors font-bold text-sm text-gray-900"
-                        placeholder="0"
-                        value={editOrderForm.deliveryFee}
-                        onChange={e => {
-                          const fee = e.target.value;
-                          setEditOrderForm({
-                            ...editOrderForm,
-                            deliveryFee: fee,
-                            total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, fee)
-                          });
-                        }}
-                      />
+                  {/* Delivery Charges & 3rd Party Rider (Side by Side) */}
+                  <div className="bg-primary/5 border border-primary/10 rounded-2xl p-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-primary tracking-wider mb-1.5 block">
+                          Delivery Charges (₹)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-full bg-white border border-black/10 rounded-xl pl-8 pr-4 py-2.5 outline-none focus:border-primary transition-colors font-bold text-sm text-gray-900"
+                            placeholder="0"
+                            value={editOrderForm.deliveryFee}
+                            onChange={e => {
+                              const fee = e.target.value;
+                              setEditOrderForm({
+                                ...editOrderForm,
+                                deliveryFee: fee,
+                                total: recalcTotal(editOrderForm.selectedServices, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, fee)
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-white border border-black/10 rounded-xl cursor-pointer select-none hover:border-primary/40 transition-colors shadow-sm">
+                          <input
+                            type="checkbox"
+                            checked={editOrderForm.paidTo3rdPartyRider}
+                            onChange={e => setEditOrderForm({ ...editOrderForm, paidTo3rdPartyRider: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
+                          />
+                          <span className="text-[11px] font-bold text-gray-700 select-none">
+                            Paid to 3rd party rider
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
