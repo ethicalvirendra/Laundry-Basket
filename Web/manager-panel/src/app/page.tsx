@@ -4019,6 +4019,12 @@ Thank you for trusting *Laundry Basket*. ❤️
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rates
                   .filter(r => filterCat === 'All' || r.category.toLowerCase() === filterCat.toLowerCase())
+                  .sort((a: any, b: any) => {
+                    const priceA = Number(a.price) || 0;
+                    const priceB = Number(b.price) || 0;
+                    if (priceA !== priceB) return priceA - priceB;
+                    return (a.item || '').localeCompare(b.item || '');
+                  })
                   .map((rate, idx) => (
                     <div key={idx} className="glass-card p-6 flex flex-col gap-4 group hover:scale-[1.02] transition-transform">
                       <div className="flex justify-between items-start">
@@ -4760,6 +4766,12 @@ Thank you for trusting *Laundry Basket*. ❤️
                         serviceType.includes(query) ||
                         category.includes(query);
                     })
+                    .sort((a: any, b: any) => {
+                      const priceA = Number(a.price) || 0;
+                      const priceB = Number(b.price) || 0;
+                      if (priceA !== priceB) return priceA - priceB;
+                      return (a.item || '').localeCompare(b.item || '');
+                    })
                     .map((r, idx) => (
                       <div key={`${r.item}-${idx}`} className="flex items-center border-b border-black/5 last:border-0 hover:bg-primary/5 transition-colors">
                         {/* Main item button */}
@@ -5230,6 +5242,12 @@ Thank you for trusting *Laundry Basket*. ❤️
                         const serviceType = (r.serviceType || "").toLowerCase();
                         const category = (r.category || "").toLowerCase();
                         return itemName.includes(query) || serviceType.includes(query) || category.includes(query);
+                      })
+                      .sort((a: any, b: any) => {
+                        const priceA = Number(a.price) || 0;
+                        const priceB = Number(b.price) || 0;
+                        if (priceA !== priceB) return priceA - priceB;
+                        return (a.item || '').localeCompare(b.item || '');
                       })
                       .map((r, idx) => (
                         <div key={`${r.item}-${idx}`} className="flex items-center hover:bg-primary/5 transition-colors">
