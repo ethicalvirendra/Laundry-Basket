@@ -5090,111 +5090,28 @@ Thank you for trusting *Laundry Basket*. ❤️
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-2 pt-2 border-t border-black/5">
-                  {dynamicCategories.map(cat => (
-                    <button key={cat} type="button"
-                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all ${selectedWalkinCat === cat ? 'bg-primary text-white border-primary' : 'bg-white/50 border-black/10 text-text-secondary hover:border-primary/30'
-                        }`}
-                      onClick={() => { setSelectedWalkinCat(cat); setEditOrderForm({ ...editOrderForm, searchQuery: '' }); }}
-                    >{cat}</button>
-                  ))}
-                </div>
+                {/* 1. CURRENT ORDER ITEMS SECTION (Shown First!) */}
+                <div className="pt-2 border-t border-black/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                      <span>📦</span> Current Order Items ({editOrderForm.selectedServices.length})
+                    </p>
+                    <span className="text-[10px] font-bold text-text-secondary">
+                      Subtotal: ₹{editOrderForm.selectedServices.reduce((acc: number, curr: any) => acc + (curr.price * curr.qty), 0)}
+                    </span>
+                  </div>
 
-                <div>
-                  <input
-                    type="text"
-                    className="w-full bg-white/50 border-2 border-primary/20 rounded-2xl px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold"
-                    placeholder="🔍 Add service to order..."
-                    value={editOrderForm.searchQuery}
-                    onChange={e => setEditOrderForm({ ...editOrderForm, searchQuery: e.target.value })}
-                  />
-                </div>
-
-                <div className="bg-white/30 border border-black/5 rounded-2xl max-h-40 overflow-y-auto custom-scrollbar">
-                  {rates
-                    .filter(r => {
-                      const query = editOrderForm.searchQuery.trim().toLowerCase();
-                      if (!query) {
-                        return r.category?.toLowerCase() === selectedWalkinCat.toLowerCase();
-                      }
-                      const itemName = (r.item || "").toLowerCase();
-                      const serviceType = (r.serviceType || "").toLowerCase();
-                      const category = (r.category || "").toLowerCase();
-                      return itemName.includes(query) ||
-                        serviceType.includes(query) ||
-                        category.includes(query);
-                    })
-                    .map((r, idx) => (
-                      <div key={`${r.item}-${idx}`} className="flex items-center border-b border-black/5 last:border-0 hover:bg-primary/5 transition-colors">
-                        <button type="button"
-                          className="flex-1 flex justify-between items-center px-4 py-2.5 text-sm"
-                          onClick={() => {
-                            const fullName = r.serviceType ? `${r.serviceType} (${r.item})` : r.item;
-                            const existingIdx = editOrderForm.selectedServices.findIndex((s: any) => s.name === fullName);
-                            let newList = [...editOrderForm.selectedServices];
-                            if (existingIdx > -1) {
-                              newList[existingIdx].qty += 1;
-                            } else {
-                              newList.push({ name: fullName, price: r.price, qty: 1 });
-                            }
-                            setEditOrderForm({ 
-                              ...editOrderForm, 
-                              selectedServices: newList, 
-                              total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee), 
-                              searchQuery: '' 
-                            });
-                          }}
-                        >
-                          <span className="font-medium text-left">{r.serviceType ? `${r.serviceType}: ` : ''}{r.item}</span>
-                          <span className="font-black text-primary shrink-0 ml-2">₹{r.price}</span>
-                        </button>
-                      </div>
-                    ))
-                  }
-                  {rates.filter(r => {
-                    const query = editOrderForm.searchQuery.trim().toLowerCase();
-                    if (!query) return r.category?.toLowerCase() === selectedWalkinCat.toLowerCase();
-                    const itemName = (r.item || "").toLowerCase();
-                    const serviceType = (r.serviceType || "").toLowerCase();
-                    const category = (r.category || "").toLowerCase();
-                    return itemName.includes(query) || serviceType.includes(query) || category.includes(query);
-                  }).length === 0 && (
-                    <div className="px-4 py-8 text-center">
-                      <p className="text-xs text-text-secondary font-bold uppercase tracking-widest">No matching services found</p>
+                  {editOrderForm.selectedServices.length === 0 ? (
+                    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 text-center">
+                      <p className="text-xs text-orange-700 font-bold">No items in this order yet. Use the search below to add items.</p>
                     </div>
-                  )}
-                  {editOrderForm.searchQuery.trim() !== '' && (
-                    <button type="button"
-                      className="w-full flex justify-between items-center px-4 py-3 text-xs hover:bg-primary/10 transition-colors border-t border-black/5 bg-primary/5 text-primary font-bold"
-                      onClick={() => {
-                        const customName = editOrderForm.searchQuery.trim();
-                        let newList = [...editOrderForm.selectedServices];
-                        newList.push({ name: customName, price: 0, qty: 1, isCustom: true, description: '' });
-                        setEditOrderForm({
-                          ...editOrderForm,
-                          selectedServices: newList,
-                          total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee),
-                          searchQuery: ''
-                        });
-                      }}
-                    >
-                      <span className="flex items-center gap-1.5 truncate">
-                        <span className="text-sm">✨</span> Add Custom Item: "{editOrderForm.searchQuery.trim()}"
-                      </span>
-                      <span className="font-black text-primary shrink-0 ml-2">Set Price Below</span>
-                    </button>
-                  )}
-                </div>
-
-                {editOrderForm.selectedServices.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-primary mb-2">Order Items & Services</p>
-                    <div className="bg-primary/5 rounded-2xl p-4 space-y-2 border border-primary/10 max-h-48 overflow-y-auto custom-scrollbar">
+                  ) : (
+                    <div className="bg-primary/5 rounded-2xl p-4 space-y-2 border border-primary/10 max-h-56 overflow-y-auto custom-scrollbar">
                       {editOrderForm.selectedServices.map((s: any, idx: number) => (
-                        <div key={idx} className={`flex justify-between items-start bg-white/50 p-3 rounded-xl ${s.isCustom ? 'border border-primary/40 bg-primary/5' : ''}`}>
+                        <div key={idx} className={`flex justify-between items-start bg-white/70 p-3 rounded-xl border border-black/5 shadow-xs ${s.isCustom ? 'border-primary/40 bg-primary/5' : ''}`}>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-1">
-                              <p className="text-xs font-bold truncate pr-2">{s.name}</p>
+                              <p className="text-xs font-black truncate pr-2 text-text-primary">{s.name}</p>
                               {s.isCustom && <span className="text-[8px] font-black px-1.5 py-0.5 bg-primary/20 text-primary rounded">✨ CUSTOM</span>}
                             </div>
                             {s.isCustom && s.description && (
@@ -5203,7 +5120,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                             {s.isCustom && (
                               <input
                                 type="text"
-                                className="w-full bg-white border border-black/5 rounded px-1.5 py-0.5 text-[9px] mb-1 outline-none focus:border-primary transition-all"
+                                className="w-full bg-white border border-black/10 rounded px-2 py-1 text-[9px] mb-1 outline-none focus:border-primary transition-all"
                                 placeholder="Add description (optional)"
                                 value={s.description || ''}
                                 onChange={e => {
@@ -5217,7 +5134,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                               <span className="text-[9px] text-text-secondary">₹</span>
                               <input
                                 type="number"
-                                className="bg-white border border-black/5 rounded px-1.5 py-0.5 text-[10px] font-bold w-16 text-primary outline-none focus:border-primary transition-all shadow-sm"
+                                className="bg-white border border-black/15 rounded px-2 py-0.5 text-[10px] font-bold w-16 text-primary outline-none focus:border-primary transition-all shadow-sm"
                                 value={s.price === 0 ? '' : s.price}
                                 placeholder="0"
                                 onChange={e => {
@@ -5264,8 +5181,114 @@ Thank you for trusting *Laundry Basket*. ❤️
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+
+                {/* 2. ADD MORE SERVICES FROM RATE CARD (Clean & clearly separated) */}
+                <div className="mt-4 pt-3 border-t border-black/5 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <span>➕</span> Add Items from Rate Card
+                    </p>
+                    <span className="text-[9px] font-bold text-slate-400">Optional</span>
                   </div>
-                )}
+
+                  <div className="flex flex-wrap gap-1.5 mb-2.5">
+                    {dynamicCategories.map(cat => (
+                      <button key={cat} type="button"
+                        className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+                          selectedWalkinCat === cat ? 'bg-primary text-white border-primary shadow-xs' : 'bg-white border-slate-200 text-slate-600 hover:border-primary/40'
+                        }`}
+                        onClick={() => { setSelectedWalkinCat(cat); }}
+                      >{cat}</button>
+                    ))}
+                  </div>
+
+                  <div className="mb-2">
+                    <input
+                      type="text"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all text-xs font-bold placeholder:text-slate-400"
+                      placeholder="🔍 Search service name (e.g. Shirt, Kurta, Dry Clean)..."
+                      value={editOrderForm.searchQuery}
+                      onChange={e => setEditOrderForm({ ...editOrderForm, searchQuery: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Rate list results (Shows when searching or browsing) */}
+                  <div className="bg-white border border-slate-200 rounded-xl max-h-36 overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+                    {rates
+                      .filter(r => {
+                        const query = editOrderForm.searchQuery.trim().toLowerCase();
+                        if (!query) {
+                          return r.category?.toLowerCase() === selectedWalkinCat.toLowerCase();
+                        }
+                        const itemName = (r.item || "").toLowerCase();
+                        const serviceType = (r.serviceType || "").toLowerCase();
+                        const category = (r.category || "").toLowerCase();
+                        return itemName.includes(query) || serviceType.includes(query) || category.includes(query);
+                      })
+                      .map((r, idx) => (
+                        <div key={`${r.item}-${idx}`} className="flex items-center hover:bg-primary/5 transition-colors">
+                          <button type="button"
+                            className="flex-1 flex justify-between items-center px-3.5 py-2 text-xs font-semibold text-slate-700"
+                            onClick={() => {
+                              const fullName = r.serviceType ? `${r.serviceType} (${r.item})` : r.item;
+                              const existingIdx = editOrderForm.selectedServices.findIndex((s: any) => s.name === fullName);
+                              let newList = [...editOrderForm.selectedServices];
+                              if (existingIdx > -1) {
+                                newList[existingIdx].qty += 1;
+                              } else {
+                                newList.push({ name: fullName, price: r.price, qty: 1 });
+                              }
+                              setEditOrderForm({ 
+                                ...editOrderForm, 
+                                selectedServices: newList, 
+                                total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee), 
+                                searchQuery: '' 
+                              });
+                            }}
+                          >
+                            <span className="text-left truncate">{r.serviceType ? `${r.serviceType}: ` : ''}{r.item}</span>
+                            <span className="font-black text-primary shrink-0 ml-2 bg-primary/10 px-2 py-0.5 rounded text-[10px]">+ ₹{r.price}</span>
+                          </button>
+                        </div>
+                      ))
+                    }
+                    {rates.filter(r => {
+                      const query = editOrderForm.searchQuery.trim().toLowerCase();
+                      if (!query) return r.category?.toLowerCase() === selectedWalkinCat.toLowerCase();
+                      const itemName = (r.item || "").toLowerCase();
+                      const serviceType = (r.serviceType || "").toLowerCase();
+                      const category = (r.category || "").toLowerCase();
+                      return itemName.includes(query) || serviceType.includes(query) || category.includes(query);
+                    }).length === 0 && (
+                      <div className="px-3 py-4 text-center">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No matching services found</p>
+                      </div>
+                    )}
+                    {editOrderForm.searchQuery.trim() !== '' && (
+                      <button type="button"
+                        className="w-full flex justify-between items-center px-3.5 py-2.5 text-xs hover:bg-primary/10 transition-colors bg-primary/5 text-primary font-bold"
+                        onClick={() => {
+                          const customName = editOrderForm.searchQuery.trim();
+                          let newList = [...editOrderForm.selectedServices];
+                          newList.push({ name: customName, price: 0, qty: 1, isCustom: true, description: '' });
+                          setEditOrderForm({
+                            ...editOrderForm,
+                            selectedServices: newList,
+                            total: recalcTotal(newList, editOrderForm.discount, editOrderForm.totalMode, editOrderForm.adjustment, editOrderForm.deliveryFee),
+                            searchQuery: ''
+                          });
+                        }}
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <span>✨</span> Add Custom Item: "{editOrderForm.searchQuery.trim()}"
+                        </span>
+                        <span className="font-black text-primary shrink-0 ml-2">Set Price Above</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 {/* Pricing & Adjustments */}
                 <div className="mt-4 space-y-3 pt-3 border-t border-black/5">
