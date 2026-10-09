@@ -12,11 +12,16 @@ env.PATH = `C:\\Windows\\System32\\WindowsPowerShell\\v1.0;C:\\Windows\\System32
 
 console.log('🚀 Running Unified Marketplace Flutter AppBundle (AAB) Build Script...');
 
-const build = spawn('cmd.exe', ['/c', 'flutter', 'build', 'appbundle', '--release'], {
-    cwd: appDir,
-    env,
-    stdio: 'inherit'
-});
+// Run flutter clean first to remove locked build artifacts
+const clean = spawn('cmd.exe', ['/c', 'flutter', 'clean'], { cwd: appDir, env, stdio: 'inherit' });
+
+clean.on('close', (cleanCode) => {
+    console.log(`Clean process exited with code ${cleanCode}. Starting release appbundle build...`);
+    const build = spawn('cmd.exe', ['/c', 'flutter', 'build', 'appbundle', '--release'], {
+        cwd: appDir,
+        env,
+        stdio: 'inherit'
+    });
 
     build.on('close', (code) => {
         console.log(`Build process exited with code ${code}`);
@@ -42,3 +47,5 @@ const build = spawn('cmd.exe', ['/c', 'flutter', 'build', 'appbundle', '--releas
             console.error(`❌ Flutter appbundle build failed with exit code ${code}`);
         }
     });
+});
+
