@@ -2030,7 +2030,14 @@ app.post('/api/orders', async (req, res) => {
             pickupRiderId: req.body.pickupRiderId || null,
             pickupRiderName: req.body.pickupRiderName || null,
             timestamp: req.body.timestamp || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            events: initialEvents
+            events: initialEvents,
+            // Always sync name <-> customer_name and phone <-> mobile_number so all panels show consistent data
+            customer_name: req.body.customer_name || req.body.name || '',
+            name: req.body.name || req.body.customer_name || '',
+            mobile_number: String(req.body.mobile_number || req.body.phone || ''),
+            phone: String(req.body.phone || req.body.mobile_number || ''),
+            customer_id: req.body.customer_id || orderId,
+            order_date: req.body.order_date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
         };
 
         // Collision-proof saving with automatic retry if duplicate key occurs
@@ -2202,6 +2209,11 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         const isTransfer = newStoreId && newStoreId !== oldStoreId;
 
         const updateData = { ...req.body };
+        // Sync name <-> customer_name and phone <-> mobile_number on updates too
+        if (req.body.name && !req.body.customer_name) updateData.customer_name = req.body.name;
+        if (req.body.customer_name && !req.body.name) updateData.name = req.body.customer_name;
+        if (req.body.phone && !req.body.mobile_number) updateData.mobile_number = String(req.body.phone);
+        if (req.body.mobile_number && !req.body.phone) updateData.phone = String(req.body.mobile_number);
         if (req.body.total !== undefined) {
             const newTotal = Number(req.body.total) || 0;
             updateData.total = newTotal;

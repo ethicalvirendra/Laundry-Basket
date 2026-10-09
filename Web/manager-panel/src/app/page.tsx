@@ -1397,7 +1397,9 @@ export default function ManagerPanel() {
       const isRcv = String(editOrderForm.paymentStatus).toLowerCase().includes('received');
       const updatedOrder = {
         name: editOrderForm.name,
+        customer_name: editOrderForm.name,
         phone: editOrderForm.phone,
+        mobile_number: editOrderForm.phone,
         address: editOrderForm.address,
         services: servicesDetails,
         total: finalTotal,
@@ -1466,7 +1468,9 @@ export default function ManagerPanel() {
       const newOrder = {
         storeId,
         name: walkinForm.name,
+        customer_name: walkinForm.name,
         phone: walkinForm.phone,
+        mobile_number: walkinForm.phone,
         services: servicesDetails,
         itemSummary: walkinForm.source === 'WhatsApp' ? 'WhatsApp Order' : 'Walk-in Order',
         total: finalTotal,
