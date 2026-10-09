@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID12345.com.laundrybasket.app",
+        "paths": [ "/index.html*", "/Pages/booking.html*", "/Pages/profile.html*" ]
+      }
+    ]
+  }
+}

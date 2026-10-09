@@ -14,6 +14,22 @@ if (fs.existsSync(src)) {
     process.exit(1);
 }
 
+// Sync Web/server.js to DEPLOY_FRESH/server.js
+const serverSrc = path.join(__dirname, 'Web', 'server.js');
+const serverDest = path.join(__dirname, 'DEPLOY_FRESH', 'server.js');
+if (fs.existsSync(serverSrc)) {
+    fs.copyFileSync(serverSrc, serverDest);
+    console.log('Synced Web/server.js to DEPLOY_FRESH/server.js');
+}
+
+// Sync Web/.well-known to DEPLOY_FRESH/.well-known
+const wkSrc = path.join(__dirname, 'Web', '.well-known');
+const wkDest = path.join(__dirname, 'DEPLOY_FRESH', '.well-known');
+if (fs.existsSync(wkSrc)) {
+    fs.cpSync(wkSrc, wkDest, { recursive: true });
+    console.log('Synced Web/.well-known to DEPLOY_FRESH/.well-known');
+}
+
 console.log('\n--- Step 2: Regenerating deployment zips ---');
 if (fs.existsSync(path.join(__dirname, 'zip_deploy.js'))) {
     execSync('node zip_deploy.js', { stdio: 'inherit' });

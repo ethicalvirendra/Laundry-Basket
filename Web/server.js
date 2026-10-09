@@ -325,7 +325,18 @@ app.get(/^\/manager\/manager\/(.*)/, (req, res) => {
     res.redirect(301, `/manager/${req.params[0]}`);
 });
 app.use('/manager', express.static(path.join(__dirname, 'manager-panel/out')));
-app.use(express.static(__dirname)); // Serves index.html, assets, and images from the root
+
+// Android App Links & iOS Universal Links verification (.well-known)
+app.get('/.well-known/assetlinks.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.sendFile(path.join(__dirname, '.well-known', 'assetlinks.json'));
+});
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.sendFile(path.join(__dirname, '.well-known', 'apple-app-site-association'));
+});
+
+app.use(express.static(__dirname, { dotfiles: 'allow' })); // Serves index.html, assets, and images from the root
 
 // --- MongoDB Connection ---
 mongoose.connect(process.env.MONGODB_URI)
