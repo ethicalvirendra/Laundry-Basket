@@ -1323,14 +1323,31 @@ export default function ManagerPanel() {
     const parsedServices = servicesList.map((s: string) => {
       const cleanStr = s.trim().replace(/^(Service:|Product:)\s*/, '');
       const parsed = parseServiceString(cleanStr);
+      let price = parsed.rate;
+      if ((!price || price === 0) && Number(order.total) > 0 && parsed.qty) {
+        if (servicesList.length === 1) {
+          price = Math.round(Number(order.total) / parsed.qty);
+        }
+      }
       return {
         name: parsed.name,
-        price: parsed.rate,
+        price: price || 0,
         qty: parsed.qty,
         isCustom: s.toLowerCase().includes('[custom]'),
         description: s.includes(' - ') ? s.split(' - ')[1] : ''
       };
     });
+
+    const itemsSum = parsedServices.reduce((acc: number, curr: any) => acc + (curr.price * curr.qty), 0);
+    if (itemsSum === 0 && Number(order.total) > 0 && parsedServices.length > 0) {
+      if (parsedServices.length === 1) {
+        parsedServices[0].price = Math.round(Number(order.total) / (parsedServices[0].qty || 1));
+      } else {
+        parsedServices.forEach((curr: any) => {
+          if (!curr.price) curr.price = 20;
+        });
+      }
+    }
 
     setEditOrderForm({
       id: order.id,
