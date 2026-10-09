@@ -18,7 +18,8 @@
     "uuid": "^14.0.0"
   },
   "overrides": {
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "proxy-addr": "^2.0.8"
   },
   "scripts": {
     "start": "node server.js"
