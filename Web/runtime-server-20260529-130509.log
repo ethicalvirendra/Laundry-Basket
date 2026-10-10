@@ -1,0 +1,568 @@
+
+> laundry-basket-backend@3.1.0 start
+> node server.js
+
+◇ injected env (7) from .env // tip: ⌘ suppress logs { quiet: true }
+✅ Firebase Admin + Firestore Initialized
+🚀 Unified Production Server running on port 5000
+✅ Connected to Laundry Basket MongoDB
+WebSocket user connected: wDSle4ee35oNwHR5AAAB
+WebSocket user connected: ZRKVhzso12OGhSvWAAAD
+WebSocket user disconnected: ZRKVhzso12OGhSvWAAAD
+WebSocket user connected: Y9_1_aBFH2hl2PRRAAAF
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user connected: Xkxizq3KhUQmV4v7AAAH
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: Xkxizq3KhUQmV4v7AAAH
+WebSocket user connected: K32OL0s4aYJr6J2HAAAJ
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: K32OL0s4aYJr6J2HAAAJ
+WebSocket user connected: R-XCxer5Vm6hObqhAAAL
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: R-XCxer5Vm6hObqhAAAL
+WebSocket user connected: mvNU37MKntbGmB9dAAAN
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: mvNU37MKntbGmB9dAAAN
+WebSocket user connected: EcGmDrtMHE3o8b5MAAAP
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: EcGmDrtMHE3o8b5MAAAP
+WebSocket user connected: IzkKK3lGH75GkS__AAAR
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: Y9_1_aBFH2hl2PRRAAAF
+WebSocket user connected: gSAQlmr6RpArSx2IAAAT
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: gSAQlmr6RpArSx2IAAAT
+WebSocket user connected: Waomx_NMGG6il93GAAAV
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: Waomx_NMGG6il93GAAAV
+WebSocket user connected: LnsX1KN8mGSf3SQMAAAX
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: LnsX1KN8mGSf3SQMAAAX
+WebSocket user connected: poQsVTJEeMekU1s7AAAZ
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: IzkKK3lGH75GkS__AAAR
+WebSocket user connected: 13G4QCVNsTTNvvtJAAAb
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: poQsVTJEeMekU1s7AAAZ
+WebSocket user connected: Fo442xfi5I261U4HAAAd
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: Fo442xfi5I261U4HAAAd
+WebSocket user connected: c-ipIh-Mgdl2d6GjAAAf
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: c-ipIh-Mgdl2d6GjAAAf
+WebSocket user connected: vmjoyO-TCSntFGAVAAAh
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: vmjoyO-TCSntFGAVAAAh
+WebSocket user connected: mp7AXRunJlwj2iMbAAAj
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: 13G4QCVNsTTNvvtJAAAb
+WebSocket user connected: cbsbt1DDfqXIo7WlAAAl
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: cbsbt1DDfqXIo7WlAAAl
+WebSocket user connected: F3SjblmyjA94Ql_9AAAn
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: F3SjblmyjA94Ql_9AAAn
+WebSocket user connected: g1zjXyNmMOPw1d6tAAAp
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: g1zjXyNmMOPw1d6tAAAp
+WebSocket user connected: ucR9kMkc48vEyH2qAAAr
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: ucR9kMkc48vEyH2qAAAr
+WebSocket user connected: JyQqTY-ynNSlP226AAAt
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: JyQqTY-ynNSlP226AAAt
+WebSocket user connected: vTvU2axYyIpOy6IHAAAv
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: vTvU2axYyIpOy6IHAAAv
+WebSocket user connected: h4lUZazLy5Hkju41AAAx
+WebSocket user disconnected: h4lUZazLy5Hkju41AAAx
+WebSocket user connected: pGhjXahVSdKymBuIAAAz
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: pGhjXahVSdKymBuIAAAz
+WebSocket user connected: Ct8G1BXyTsxprG_lAAA1
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: Ct8G1BXyTsxprG_lAAA1
+WebSocket user connected: 8cnIPcqu5TFzU-P2AAA3
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: mp7AXRunJlwj2iMbAAAj
+WebSocket user connected: Mf9GBAqjX2toc3vKAAA5
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: wDSle4ee35oNwHR5AAAB
+WebSocket user connected: jmamO7_G86dAZoNCAAA7
+Admin/Manager joined global dashboard room
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: 8cnIPcqu5TFzU-P2AAA3
+WebSocket user connected: 1gChOb-a2kXS6EzOAAA9
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: 1gChOb-a2kXS6EzOAAA9
+WebSocket user connected: alGRFyGQ-5nlg66QAAA_
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: alGRFyGQ-5nlg66QAAA_
+WebSocket user connected: WgTgMSXJ8vEERKbtAABB
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: WgTgMSXJ8vEERKbtAABB
+WebSocket user connected: BStJFN5MALXwB5EgAABD
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: Mf9GBAqjX2toc3vKAAA5
+WebSocket user connected: 2U9m-YTf4Wm5fStDAABF
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: 2U9m-YTf4Wm5fStDAABF
+WebSocket user connected: -hXG4cAXyaigzFRwAABH
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: BStJFN5MALXwB5EgAABD
+WebSocket user connected: 87NzMbnBZ-H9LS9EAABJ
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: 87NzMbnBZ-H9LS9EAABJ
+WebSocket user connected: KbZ3PSCA4ReY305lAABL
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: -hXG4cAXyaigzFRwAABH
+WebSocket user connected: qfEc7OaEO_nNgPqCAABN
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: KbZ3PSCA4ReY305lAABL
+WebSocket user connected: xRvYlRQOJaBT7dtgAABP
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: xRvYlRQOJaBT7dtgAABP
+WebSocket user connected: _JNnLOaJHmrHLn6VAABR
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: qfEc7OaEO_nNgPqCAABN
+WebSocket user connected: W9_FNBhwe2xdsWMvAABT
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: _JNnLOaJHmrHLn6VAABR
+WebSocket user connected: y1nQVGuVa0gaTSLRAABV
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: y1nQVGuVa0gaTSLRAABV
+WebSocket user connected: 0zsIAEXatXlqy3GZAABX
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: 0zsIAEXatXlqy3GZAABX
+WebSocket user connected: 3bRBNSFSyMeAO7qPAABZ
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: 3bRBNSFSyMeAO7qPAABZ
+WebSocket user connected: bfWsFbbylnpm2dehAABb
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: bfWsFbbylnpm2dehAABb
+WebSocket user connected: B2gWA-ZRNu3OsUopAABd
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: B2gWA-ZRNu3OsUopAABd
+WebSocket user connected: anbcDeIjsCJG80gpAABf
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: anbcDeIjsCJG80gpAABf
+WebSocket user connected: wxE7vUzTtVugFCJCAABh
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: wxE7vUzTtVugFCJCAABh
+WebSocket user connected: P0VDnp018VaZUuTvAABj
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: W9_FNBhwe2xdsWMvAABT
+WebSocket user connected: 6-YZ_0MBvGW5nfStAABl
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: P0VDnp018VaZUuTvAABj
+WebSocket user connected: _ZkCgEoPlyNDb1XPAABn
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: 6-YZ_0MBvGW5nfStAABl
+WebSocket user connected: G92aryfS6kvaFQRlAABp
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: _ZkCgEoPlyNDb1XPAABn
+WebSocket user connected: iiEPlyzRv39CjdonAABr
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user disconnected: iiEPlyzRv39CjdonAABr
+WebSocket user connected: gMkRlzCFpmqWI3fTAABt
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854

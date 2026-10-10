@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17877718922"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-17877718922');
+    
+    // Track conversion if not tracked yet for this session
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId') || 'LB-NEW-ORDER';
+        
+        if (!sessionStorage.getItem('tracked_order_' + orderId)) {
+            gtag('event', 'conversion', {
+                'send_to': 'AW-17877718922/conversion_label_here', 
+                'transaction_id': orderId
+            });
+            sessionStorage.setItem('tracked_order_' + orderId, 'true');
+        }
+        
+        if(urlParams.get('orderId')) {
+            document.getElementById('display-order-id').innerText = urlParams.get('orderId');
+        }
+    });
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmed | Laundry Basket</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link rel="icon" type="image/png" href="../images/logo.png">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script defer src="../assets/js/scripts.js"></script>
+</head>
+
+<body style="background: var(--bg-light);">
+  <div id="site-header"></div>
+  
+  <div class="container" style="min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px;">
+    
+    <div style="max-width: 480px; width: 100%; padding: 50px 40px; text-align: center; background: white; border-radius: 32px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.08); border: 1px solid rgba(0,0,0,0.05);">
+      <div style="width: 90px; height: 90px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px; font-size: 2.5rem; animation: checkmarkBounce 0.8s ease-in-out forwards;">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 12px; color: #1e293b;">Booking Confirmed!</h2>
+      <p style="color: #64748b; margin-bottom: 35px; line-height: 1.6; font-size: 1.05rem;">Your garments are now in professional hands. A rider will arrive at your doorstep shortly.</p>
+      
+      <div style="background: #f1f5f9; border: 2px dashed #e2e8f0; border-radius: 20px; padding: 20px; margin-bottom: 35px;">
+        <span style="display: block; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; font-weight: 700;">Order Reference</span>
+        <strong id="display-order-id" style="font-size: 1.6rem; color: #1a6fdb; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;">LB-PRO-1024</strong>
+      </div>
+      
+      <div style="display: flex; gap: 15px; justify-content: center;">
+          <a href="../index.html" class="button button-outline" style="padding: 14px 24px;">Return Home</a>
+          <a href="profile.html" class="button button-accent" style="padding: 14px 24px;">Track Order</a>
+      </div>
+    </div>
+    
+  </div>
+  
+  <div id="site-footer"></div>
+  
+  <style>
+      @keyframes checkmarkBounce {
+          0% { transform: scale(0); opacity: 0; }
+          60% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+      }
+  </style>
+</body>
+</html>

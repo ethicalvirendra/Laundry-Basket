@@ -1,0 +1,6 @@
+
+> laundry-basket-backend@3.1.0 start
+> node server.js
+
+◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+✅ Firebase Admin + Firestore Initialized

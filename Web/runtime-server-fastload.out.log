@@ -1,0 +1,27 @@
+◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+✅ Firebase Admin + Firestore Initialized
+🚀 Unified Production Server running on port 5000
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+📝 Log Received: {
+  level: 'ERROR',
+  message: 'Fetch Orders Failed',
+  details: 'TypeError: Failed to fetch',
+  platform: 'web-manager',
+  user: 'Ayodhya Nagar'
+}
+WebSocket user connected: JUB6zM33aoWt35mSAAAC
+WebSocket user connected: LrzqmrdOPdVAX5TNAAAD
+WebSocket user connected: FvjFcq6HkzJLkm1UAAAF
+✅ Connected to Laundry Basket MongoDB
+WebSocket user disconnected: LrzqmrdOPdVAX5TNAAAD
+WebSocket user connected: d9TyqeD5_EnVO7_KAAAH
+Admin/Manager joined global dashboard room
+Manager joined store room store_LBST-854
+WebSocket user disconnected: FvjFcq6HkzJLkm1UAAAF
+WebSocket user disconnected: JUB6zM33aoWt35mSAAAC

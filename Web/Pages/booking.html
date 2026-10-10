@@ -624,7 +624,7 @@
 
           const modal = document.getElementById('success-modal');
           document.getElementById('display-order-id').innerText = savedOrder.id;
-          modal.style.display = 'flex';
+          window.location.href = 'thank-you.html?orderId=' + savedOrder.id; // modal.style.display = 'flex';
 
           if (window.trackGAEvent) {
             window.trackGAEvent('booking_placed', {
