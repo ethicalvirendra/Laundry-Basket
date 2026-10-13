@@ -3759,11 +3759,11 @@ Thank you for trusting *Laundry Basket*. ❤️
                                     <div>
                                       {analysis.variance === 0 ? (
                                         <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-800 border border-emerald-500/20">
-                                          ✅ Full Rate Card
+                                          ✅ Full Rate (0% Discount)
                                         </span>
                                       ) : analysis.variance > 0 ? (
-                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20">
-                                          ⚠️ Gap: -₹{analysis.variance} (-{analysis.variancePct}%)
+                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20 inline-flex items-center gap-0.5">
+                                          <span>🏷️</span> Discount: ₹{analysis.variance} ({analysis.variancePct}% OFF)
                                         </span>
                                       ) : (
                                         <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-blue-500/15 text-blue-800 border border-blue-500/20">
@@ -3771,12 +3771,23 @@ Thank you for trusting *Laundry Basket*. ❤️
                                         </span>
                                       )}
                                     </div>
-                                    <button
-                                      onClick={() => setRateBreakdownOrder(o)}
-                                      className="text-[8.5px] font-black text-primary hover:underline text-left mt-0.5 cursor-pointer flex items-center gap-0.5"
-                                    >
-                                      <span>🔍 View Exact Rates</span>
-                                    </button>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <button
+                                        onClick={() => setRateBreakdownOrder(o)}
+                                        className="text-[8.5px] font-black text-primary hover:underline cursor-pointer flex items-center gap-0.5"
+                                        title="View item-by-item rate comparison"
+                                      >
+                                        <span>🔍 Exact Rates</span>
+                                      </button>
+                                      <span className="text-[8.5px] text-black/20">·</span>
+                                      <button
+                                        onClick={() => handleStartEditOrder(o)}
+                                        className="text-[8.5px] font-black text-amber-600 hover:underline cursor-pointer flex items-center gap-0.5"
+                                        title="Edit order discount"
+                                      >
+                                        <span>✏️ Discount</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -4577,12 +4588,12 @@ Thank you for trusting *Laundry Basket*. ❤️
                     </div>
                     <div className="mt-2">
                       {totalVarianceToday > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-900 border border-amber-500/30">
-                          ⚠️ -₹{totalVarianceToday} gap ({discountedOrdersCount} cx undercharged)
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                          <span>🏷️</span> ₹{totalVarianceToday} Total Discount ({discountedOrdersCount} orders discounted)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-900 border border-emerald-500/30">
-                          ✅ 100% Rate Card Matched
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-900 border border-emerald-500/30">
+                          <span>✅</span> Full Rate Realization (0% Discount)
                         </span>
                       )}
                     </div>
@@ -4742,7 +4753,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                                 </span>
                               </td>
 
-                              {/* 6. Rate Card vs Billed (Exact Rate Realization) */}
+                              {/* 6. Rate Card vs Billed (Discount & Rate Realization) */}
                               <td className="p-3.5 align-top">
                                 <div className="flex flex-col gap-1 min-w-[140px]">
                                   <div className="flex items-baseline justify-between gap-2">
@@ -4755,25 +4766,36 @@ Thank you for trusting *Laundry Basket*. ❤️
                                   </div>
                                   <div>
                                     {analysis.variance === 0 ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-emerald-500/15 text-emerald-800 border border-emerald-500/20">
-                                        ✅ Full Rate Card
+                                      <span className="px-2 py-0.5 rounded-md text-[8.5px] font-black bg-emerald-500/15 text-emerald-800 border border-emerald-500/20">
+                                        ✅ Full Rate (0% Discount)
                                       </span>
                                     ) : analysis.variance > 0 ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20">
-                                        ⚠️ Gap: -₹{analysis.variance} (-{analysis.variancePct}%)
+                                      <span className="px-2 py-0.5 rounded-md text-[8.5px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20 inline-flex items-center gap-1">
+                                        <span>🏷️</span> Discount: ₹{analysis.variance} ({analysis.variancePct}% OFF)
                                       </span>
                                     ) : (
-                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-blue-500/15 text-blue-800 border border-blue-500/20">
+                                      <span className="px-2 py-0.5 rounded-md text-[8.5px] font-black bg-blue-500/15 text-blue-800 border border-blue-500/20">
                                         🔥 Premium: +₹{Math.abs(analysis.variance)}
                                       </span>
                                     )}
                                   </div>
-                                  <button
-                                    onClick={() => setRateBreakdownOrder(o)}
-                                    className="text-[9px] font-black text-primary hover:underline text-left mt-0.5 cursor-pointer flex items-center gap-0.5"
-                                  >
-                                    <span>🔍 View Exact Rates</span>
-                                  </button>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <button
+                                      onClick={() => setRateBreakdownOrder(o)}
+                                      className="text-[9px] font-black text-primary hover:underline cursor-pointer flex items-center gap-0.5"
+                                      title="View Item-by-Item Rate Breakdown"
+                                    >
+                                      <span>🔍 Exact Rates</span>
+                                    </button>
+                                    <span className="text-[9px] text-black/20">·</span>
+                                    <button
+                                      onClick={() => handleStartEditOrder(o)}
+                                      className="text-[9px] font-black text-amber-600 hover:underline cursor-pointer flex items-center gap-0.5"
+                                      title="Edit Order & Adjust Discount"
+                                    >
+                                      <span>✏️ Discount</span>
+                                    </button>
+                                  </div>
                                 </div>
                               </td>
 
@@ -6457,14 +6479,9 @@ Thank you for trusting *Laundry Basket*. ❤️
                   {/* 3 Summary Badges */}
                   <div className="grid grid-cols-3 gap-3 mt-5">
                     <div className="bg-white/10 rounded-2xl p-3 border border-white/10 backdrop-blur-xs">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">Max Rate Possible</span>
+                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">💎 Rate Card Total</span>
                       <span className="text-xl font-black text-white">₹{analysis.maxPossible}</span>
-                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Based on Rate List</span>
-                    </div>
-                    <div className="bg-white/10 rounded-2xl p-3 border border-white/10 backdrop-blur-xs">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">Actual Billed</span>
-                      <span className="text-xl font-black text-white">₹{analysis.actualCharged}</span>
-                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Final Order Total</span>
+                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Based on 559 Master Rate List</span>
                     </div>
                     <div className={`rounded-2xl p-3 border backdrop-blur-xs ${
                       analysis.variance === 0 
@@ -6474,14 +6491,19 @@ Thank you for trusting *Laundry Basket*. ❤️
                           : 'bg-blue-500/20 border-blue-400/30'
                     }`}>
                       <span className="text-[9px] font-black uppercase tracking-wider text-white/90 block">
-                        {analysis.variance === 0 ? 'Variance' : analysis.variance > 0 ? 'Discount / Leakage' : 'Premium Charged'}
+                        {analysis.variance === 0 ? '🏷️ Discount Given' : analysis.variance > 0 ? '🏷️ Discount Given' : 'Premium Charged'}
                       </span>
                       <span className="text-xl font-black text-white">
-                        {analysis.variance === 0 ? '₹0 (100%)' : analysis.variance > 0 ? `-₹${analysis.variance} (-${analysis.variancePct}%)` : `+₹${Math.abs(analysis.variance)}`}
+                        {analysis.variance === 0 ? '₹0 (0% OFF)' : analysis.variance > 0 ? `₹${analysis.variance} (${analysis.variancePct}% OFF)` : `+₹${Math.abs(analysis.variance)}`}
                       </span>
                       <span className="text-[9px] text-white/80 block mt-0.5">
-                        {analysis.variance === 0 ? 'Exact Rate Card Match' : analysis.variance > 0 ? 'Undercharged vs standard' : 'Charged above standard'}
+                        {analysis.variance === 0 ? 'Full Rate Card Realization' : analysis.variance > 0 ? 'Customer discount vs rate list' : 'Billed above standard'}
                       </span>
+                    </div>
+                    <div className="bg-white/10 rounded-2xl p-3 border border-white/10 backdrop-blur-xs">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">💵 Actual Billed</span>
+                      <span className="text-xl font-black text-white">₹{analysis.actualCharged}</span>
+                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Final Order Total</span>
                     </div>
                   </div>
                 </div>
@@ -6503,7 +6525,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                           <th className="p-3 text-right">Billed Rate</th>
                           <th className="p-3 text-right">Max Total</th>
                           <th className="p-3 text-right">Billed Total</th>
-                          <th className="p-3 text-right">Variance</th>
+                          <th className="p-3 text-right">Discount</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-black/5">
@@ -6528,11 +6550,11 @@ Thank you for trusting *Laundry Basket*. ❤️
                             </td>
                             <td className="p-3 text-right font-black">
                               {it.diff === 0 ? (
-                                <span className="text-emerald-600">₹0</span>
+                                <span className="text-emerald-600">₹0 (0%)</span>
                               ) : it.diff > 0 ? (
-                                <span className="text-amber-600">-₹{it.diff}</span>
+                                <span className="text-amber-600 font-bold">🏷️ ₹{it.diff} OFF</span>
                               ) : (
-                                <span className="text-blue-600">+₹{Math.abs(it.diff)}</span>
+                                <span className="text-blue-600 font-bold">+₹{Math.abs(it.diff)}</span>
                               )}
                             </td>
                           </tr>
@@ -6543,16 +6565,29 @@ Thank you for trusting *Laundry Basket*. ❤️
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-black/5 bg-slate-50 flex justify-between items-center">
+                <div className="p-4 border-t border-black/5 bg-slate-50 flex justify-between items-center gap-4 flex-wrap">
                   <span className="text-[10px] text-text-secondary font-medium">
                     Verified against Laundry Basket Global Master Rate List (559 rates)
                   </span>
-                  <button
-                    onClick={() => setRateBreakdownOrder(null)}
-                    className="btn-primary px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-                  >
-                    Close
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const orderToEdit = rateBreakdownOrder;
+                        setRateBreakdownOrder(null);
+                        handleStartEditOrder(orderToEdit);
+                      }}
+                      className="btn-primary bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      title="Open Edit Order to adjust discount percentage or price"
+                    >
+                      <span>🏷️ Adjust Discount</span>
+                    </button>
+                    <button
+                      onClick={() => setRateBreakdownOrder(null)}
+                      className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-black/5 hover:bg-black/10 transition-colors text-text-secondary cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
