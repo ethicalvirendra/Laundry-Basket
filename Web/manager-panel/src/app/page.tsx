@@ -344,6 +344,51 @@ const formatIsoToLong = (iso: string) => {
   }
 };
 
+const toInputDateValue = (dateStr: any): string => {
+  if (!dateStr) return '';
+  const s = String(dateStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const datePart = s.split(',')[0].trim();
+  const dmy = datePart.split('/');
+  if (dmy.length === 3) {
+    const day = dmy[0].padStart(2, '0');
+    const month = dmy[1].padStart(2, '0');
+    let year = dmy[2].trim();
+    if (year.length === 2) year = '20' + year;
+    if (year.length === 4) return `${year}-${month}-${day}`;
+  }
+  const hyphenParts = datePart.split('-');
+  if (hyphenParts.length === 3 && hyphenParts[0].length <= 2) {
+    const day = hyphenParts[0].padStart(2, '0');
+    const month = hyphenParts[1].padStart(2, '0');
+    let year = hyphenParts[2].trim();
+    if (year.length === 2) year = '20' + year;
+    if (year.length === 4) return `${year}-${month}-${day}`;
+  }
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    }
+  } catch (_) {}
+  return '';
+};
+
+const formatDisplayDate = (dateStr: any): string => {
+  const iso = toInputDateValue(dateStr);
+  if (!iso) return '-';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const getOrderPickupDate = (o: any): string => {
+  return o?.pickup_date || o?.pickupDate || o?.order_date || o?.date || (o?.timestamp ? String(o.timestamp).split(',')[0].trim() : '');
+};
+
+const getOrderDeliveryDate = (o: any): string => {
+  return o?.delivery_date || o?.deliveryDate || o?.expected_delivery || '';
+};
+
 const isOrderOnDate = (o: any, targetIso: string) => {
   if (!targetIso) return true;
   const [y, m, d] = targetIso.split('-');
@@ -363,6 +408,8 @@ const isOrderOnDate = (o: any, targetIso: string) => {
     String(o.timestamp || ''),
     String(o.order_date || ''),
     String(o.date || ''),
+    String(o.pickup_date || ''),
+    String(o.pickupDate || ''),
     String(o.received_date || '')
   ];
 
@@ -384,6 +431,209 @@ const isOrderOnDate = (o: any, targetIso: string) => {
   }
 
   return false;
+};
+
+const isOrderOnDateWithType = (o: any, targetIso: string, filterType: 'placed' | 'pickup' | 'delivery') => {
+  if (!targetIso) return true;
+  if (filterType === 'placed') {
+    return isOrderOnDate(o, targetIso);
+  }
+  if (filterType === 'pickup') {
+    const pDate = getOrderPickupDate(o);
+    if (!pDate) return false;
+    const pIso = toInputDateValue(pDate);
+    if (pIso === targetIso) return true;
+    return isOrderOnDate({ timestamp: pDate }, targetIso);
+  }
+  if (filterType === 'delivery') {
+    const dDate = getOrderDeliveryDate(o);
+    if (!dDate) return false;
+    const dIso = toInputDateValue(dDate);
+    if (dIso === targetIso) return true;
+    return isOrderOnDate({ timestamp: dDate }, targetIso);
+  }
+  return isOrderOnDate(o, targetIso);
+};
+
+// Rate Comparison and Revenue Leakage Analysis
+interface RateItemComparison {
+  name: string;
+  serviceType: string;
+  item: string;
+  qty: number;
+  chargedPrice: number;
+  chargedUnitPrice: number;
+  cardUnitPrice: number | null;
+  cardTotal: number;
+  maxItemTotal: number;
+  diff: number;
+  isCustom: boolean;
+}
+
+interface OrderRateAnalysis {
+  orderId: string;
+  customerName: string;
+  maxPossible: number;
+  actualCharged: number;
+  receivedAmount: number;
+  pendingAmount: number;
+  variance: number; // positive = undercharged/discount (leakage), negative = premium charged
+  variancePct: number;
+  status: 'standard' | 'discounted' | 'premium';
+  items: RateItemComparison[];
+}
+
+const parseOrderServiceEntry = (s: any) => {
+  if (!s) return null;
+  if (typeof s === 'object' && s !== null && s.name) {
+    const qty = Number(s.qty) || 1;
+    const price = Number(s.price) || 0;
+    return {
+      raw: `${s.name} x${qty} (₹${price * qty})`,
+      name: String(s.name),
+      qty,
+      charged: price * qty,
+      unitPrice: price,
+      isCustom: !!s.isCustom
+    };
+  }
+  if (typeof s !== 'string') return null;
+
+  const str = s.trim();
+  const qtyMatch = str.match(/x\s*(\d+)/i);
+  const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+  const priceMatch = str.match(/\(₹\s*(\d+(?:\.\d+)?)\)/);
+  const charged = priceMatch ? parseFloat(priceMatch[1]) : 0;
+  const unitPrice = qty > 0 ? charged / qty : charged;
+  const isCustom = /\[Custom\]/i.test(str);
+
+  let cleanName = str.split(' x')[0].replace(/\[Custom\]/ig, '').trim();
+
+  return { raw: str, name: cleanName, qty, charged, unitPrice, isCustom };
+};
+
+const normalizeStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const computeOrderRateAnalysis = (order: any, ratesList: any[] = []): OrderRateAnalysis => {
+  const rawServices = Array.isArray(order?.services)
+    ? order.services
+    : (typeof order?.services === 'string' ? order.services.split(',') : []);
+
+  let rateCardSubtotal = 0;
+  let chargedItemsSubtotal = 0;
+  const items: RateItemComparison[] = [];
+
+  rawServices.forEach((entry: any) => {
+    const parsed = parseOrderServiceEntry(entry);
+    if (!parsed) return;
+
+    chargedItemsSubtotal += parsed.charged;
+
+    let serviceType = '';
+    let itemName = parsed.name;
+    const matchParenthesis = parsed.name.match(/^(.*?)\s*\(\s*(.*?)\s*\)$/);
+    if (matchParenthesis) {
+      serviceType = matchParenthesis[1].trim();
+      itemName = matchParenthesis[2].trim();
+    } else if (parsed.name.includes(':')) {
+      const parts = parsed.name.split(':');
+      serviceType = parts[0].trim();
+      itemName = parts.slice(1).join(':').trim();
+    }
+
+    const normName = normalizeStr(parsed.name);
+    const normItem = normalizeStr(itemName);
+    const normService = normalizeStr(serviceType);
+
+    let cardPrice: number | null = null;
+
+    if (ratesList && ratesList.length > 0) {
+      // 1. Exact match by serviceType and item
+      if (normService && normItem) {
+        for (const r of ratesList) {
+          if (normalizeStr(r.serviceType) === normService && normalizeStr(r.item) === normItem) {
+            cardPrice = Number(r.price) || 0;
+            break;
+          }
+        }
+      }
+
+      // 2. Exact match of combined name
+      if (cardPrice === null) {
+        for (const r of ratesList) {
+          const rCombined = normalizeStr(`${r.serviceType || ''} ${r.item || ''}`);
+          const rCombinedRev = normalizeStr(`${r.item || ''} ${r.serviceType || ''}`);
+          if (normName === rCombined || normName === rCombinedRev) {
+            cardPrice = Number(r.price) || 0;
+            break;
+          }
+        }
+      }
+
+      // 3. Substring match
+      if (cardPrice === null) {
+        for (const r of ratesList) {
+          const rItem = normalizeStr(r.item);
+          const rServ = normalizeStr(r.serviceType);
+          if (rItem && (normName.includes(rItem) || normItem.includes(rItem))) {
+            if (!normService || !rServ || normService === rServ || normName.includes(rServ)) {
+              cardPrice = Number(r.price) || 0;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    const cardUnitPrice = cardPrice !== null && cardPrice > 0 ? cardPrice : null;
+    const effectiveMaxUnitPrice = cardUnitPrice !== null ? cardUnitPrice : parsed.unitPrice;
+    const maxItemTotal = effectiveMaxUnitPrice * parsed.qty;
+    const itemCardTotal = (cardUnitPrice !== null ? cardUnitPrice : 0) * parsed.qty;
+
+    rateCardSubtotal += maxItemTotal;
+
+    items.push({
+      name: parsed.name,
+      serviceType,
+      item: itemName,
+      qty: parsed.qty,
+      chargedPrice: parsed.charged,
+      chargedUnitPrice: parsed.unitPrice,
+      cardUnitPrice,
+      cardTotal: itemCardTotal,
+      maxItemTotal,
+      diff: maxItemTotal - parsed.charged,
+      isCustom: parsed.isCustom
+    });
+  });
+
+  const actualCharged = Number(order?.total) || 0;
+  const subtotal = Number(order?.subtotal) || 0;
+  const maxPossible = Math.max(rateCardSubtotal, subtotal, actualCharged);
+  const variance = maxPossible - actualCharged;
+  const variancePct = maxPossible > 0 ? Math.round((variance / maxPossible) * 100) : 0;
+
+  const isRcv = String(order?.paymentStatus || order?.payment_status || '').toLowerCase().includes('received');
+  const receivedAmount = order?.received_amount !== undefined ? Number(order.received_amount) : (isRcv ? actualCharged : 0);
+  const pendingAmount = order?.pending_amount !== undefined ? Number(order.pending_amount) : (isRcv ? 0 : actualCharged);
+
+  let status: 'standard' | 'discounted' | 'premium' = 'standard';
+  if (variance > 0) status = 'discounted';
+  else if (variance < 0) status = 'premium';
+
+  return {
+    orderId: order?.id || '',
+    customerName: order?.name || order?.customer_name || 'Customer',
+    maxPossible,
+    actualCharged,
+    receivedAmount,
+    pendingAmount,
+    variance,
+    variancePct,
+    status,
+    items
+  };
 };
 
 export default function ManagerPanel() {
@@ -442,6 +692,47 @@ export default function ManagerPanel() {
   const jumpToYesterday = () => {
     setSelectedDailyDate(shiftIsoDate(getTodayKolkataIso(), -1));
   };
+    const [dailyDateFilterType, setDailyDateFilterType] = useState<'placed' | 'pickup' | 'delivery'>('placed');
+  const [rateBreakdownOrder, setRateBreakdownOrder] = useState<any | null>(null);
+  const [isUpdatingOrderDates, setIsUpdatingOrderDates] = useState<string | null>(null);
+
+  const handleQuickUpdateDates = async (orderId: string, newPickupDate: string, newDeliveryDate: string) => {
+    setIsUpdatingOrderDates(orderId);
+    try {
+      const token = localStorage.getItem('lb_auth_token');
+      setOrders(prev => prev.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            pickup_date: newPickupDate,
+            pickupDate: newPickupDate,
+            delivery_date: newDeliveryDate,
+            deliveryDate: newDeliveryDate
+          };
+        }
+        return o;
+      }));
+
+      await fetch(`${API_BASE}/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          pickup_date: newPickupDate,
+          pickupDate: newPickupDate,
+          delivery_date: newDeliveryDate,
+          deliveryDate: newDeliveryDate
+        })
+      });
+    } catch (err) {
+      console.error('Error updating dates:', err);
+    } finally {
+      setIsUpdatingOrderDates(null);
+    }
+  };
+
   const [editOrderForm, setEditOrderForm] = useState<any>({
     id: '',
     name: '',
@@ -547,9 +838,29 @@ export default function ManagerPanel() {
   };
 
   // Walk-in Form State
-  const [walkinForm, setWalkinForm] = useState({
+  interface WalkinFormState {
+  name: string;
+  phone: string;
+  pickup_date?: string;
+  delivery_date?: string;
+  selectedServices: { name: string, price: number, qty: number, isCustom?: boolean, description?: string }[];
+  total: string;
+  totalMode: 'auto' | 'override' | 'adjustment';
+  adjustment: string;
+  timestamp: string;
+  searchQuery: string;
+  discount: string;
+  source: string;
+  address: string;
+  cx_type: string;
+  sourceSegment: string;
+}
+
+const [walkinForm, setWalkinForm] = useState<WalkinFormState>({
     name: '',
     phone: '',
+    pickup_date: getTodayKolkataIso(),
+    delivery_date: shiftIsoDate(getTodayKolkataIso(), 2),
     selectedServices: [] as { name: string, price: number, qty: number, isCustom?: boolean, description?: string }[],
     total: '0',
     totalMode: 'auto' as 'auto' | 'override' | 'adjustment',
@@ -653,7 +964,7 @@ export default function ManagerPanel() {
   const selectCustomer = (cx: any) => {
     setSelectedRepeatCustomer(cx);
     const hasAddress = Boolean(cx.address && cx.address.trim() && cx.address !== 'Store Walk-in' && cx.address !== 'Self Pickup');
-    setWalkinForm(prev => ({
+    setWalkinForm((prev: WalkinFormState) => ({
       ...prev,
       name: cx.name || prev.name,
       phone: cx.phone || prev.phone,
@@ -1075,28 +1386,36 @@ export default function ManagerPanel() {
 
   const exportDailyOrdersExcel = (targetIso: string = selectedDailyDate) => {
     try {
-      const targetOrders = orders.filter(o => isOrderOnDate(o, targetIso));
+      const targetOrders = orders.filter(o => isOrderOnDateWithType(o, targetIso, dailyDateFilterType));
       const dispDate = formatIsoToDisplay(targetIso);
 
-      const data = targetOrders.map(order => ({
-        'Order ID': order.id || order.customer_id,
-        'Date': order.timestamp || order.order_date || dispDate,
-        'Customer Name': order.name || order.customer_name || '-',
-        'Phone': order.phone || order.mobile_number || '-',
-        'Address': order.address || '-',
-        'Services': Array.isArray(order.services) ? order.services.join(', ') : order.services || '-',
-        'Total Amount (₹)': Number(order.total) || 0,
-        'Payment Status': order.paymentStatus || order.payment_status || 'Pending',
-        'Payment Mode': order.paymentMode || order.payment_mode || '-',
-        'Order Status': order.status || 'Pending'
-      }));
+      const data = targetOrders.map(order => {
+        const rateInfo = computeOrderRateAnalysis(order, rates);
+        return {
+          'Order ID': order.id || order.customer_id,
+          'Placement Date': order.timestamp || order.order_date || dispDate,
+          'Pickup Date': formatDisplayDate(getOrderPickupDate(order)),
+          'Delivery Date': formatDisplayDate(getOrderDeliveryDate(order)),
+          'Customer Name': order.name || order.customer_name || '-',
+          'Phone': order.phone || order.mobile_number || '-',
+          'Address': order.address || '-',
+          'Services': Array.isArray(order.services) ? order.services.join(', ') : order.services || '-',
+          'Max Rate Possible (₹)': rateInfo.maxPossible,
+          'Actual Billed (₹)': Number(order.total) || 0,
+          'Rate Gap / Discount (₹)': rateInfo.variance,
+          'Payment Status': order.paymentStatus || order.payment_status || 'Pending',
+          'Payment Mode': order.paymentMode || order.payment_mode || '-',
+          'Order Status': order.status || 'Pending'
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       const isToday = targetIso === getTodayKolkataIso();
-      const sheetName = isToday ? "Today Orders" : `Orders ${dispDate.replace(/\//g, '-')}`;
+      const filterLabel = dailyDateFilterType === 'pickup' ? 'Pickups' : (dailyDateFilterType === 'delivery' ? 'Deliveries' : 'Orders');
+      const sheetName = isToday ? `Today ${filterLabel}` : `${filterLabel} ${dispDate.replace(/\//g, '-')}`;
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, `Orders_${storeId}_${targetIso}.xlsx`);
+      XLSX.writeFile(wb, `${filterLabel}_${storeId}_${targetIso}.xlsx`);
     } catch (err) {
       alert("Failed to export Excel.");
       console.error(err);
@@ -1598,7 +1917,7 @@ export default function ManagerPanel() {
         const createdOrder = await res.json();
         trackEvent('walkin_order_created', { total: newOrder.total, services: newOrder.services });
         setShowWalkinModal(false);
-        setWalkinForm({ name: '', phone: '', selectedServices: [], total: '0', totalMode: 'auto', adjustment: '', timestamp: '', searchQuery: '', discount: '0', source: 'Walk-in', address: '', cx_type: 'Residential', sourceSegment: 'RF' });
+        setWalkinForm({ name: '', phone: '', pickup_date: getTodayKolkataIso(), delivery_date: shiftIsoDate(getTodayKolkataIso(), 2), selectedServices: [], total: '0', totalMode: 'auto', adjustment: '', timestamp: '', searchQuery: '', discount: '0', source: 'Walk-in', address: '', cx_type: 'Residential', sourceSegment: 'RF' });
         setSelectedRepeatCustomer(null);
         setDetectedCustomer(null);
         setCxSearchQuery('');
@@ -3904,11 +4223,27 @@ Thank you for trusting *Laundry Basket*. ❤️
             const displayDateStr = formatIsoToDisplay(selectedDailyDate);
             const formattedLongDate = formatIsoToLong(selectedDailyDate);
 
-            // Filter orders for the selected date
-            const todayOrdersList = orders.filter((o: any) => isOrderOnDate(o, selectedDailyDate));
+            // Filter orders for the selected date & filter mode
+            const todayOrdersList = orders.filter((o: any) => isOrderOnDateWithType(o, selectedDailyDate, dailyDateFilterType));
 
             const totalOrdersCount = todayOrdersList.length;
             const totalRevenueToday = todayOrdersList.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
+
+            // Rate Analysis for all orders on this date
+            const ordersAnalysisMap = new Map<string, OrderRateAnalysis>();
+            let totalRateCardPotential = 0;
+            let totalVarianceToday = 0;
+            let discountedOrdersCount = 0;
+
+            todayOrdersList.forEach((o: any) => {
+              const analysis = computeOrderRateAnalysis(o, rates);
+              ordersAnalysisMap.set(o.id, analysis);
+              totalRateCardPotential += analysis.maxPossible;
+              if (analysis.variance > 0) {
+                totalVarianceToday += analysis.variance;
+                discountedOrdersCount++;
+              }
+            });
 
             const receivedOrdersToday = todayOrdersList.filter((o: any) => o.paymentStatus === 'Received' || o.payment_status === 'Received');
             const totalReceivedToday = receivedOrdersToday.reduce((sum: number, o: any) => sum + (Number(o.received_amount !== undefined ? o.received_amount : o.total) || 0), 0);
@@ -3924,17 +4259,25 @@ Thank you for trusting *Laundry Basket*. ❤️
             const pendingRevenueToday = Math.max(0, totalRevenueToday - totalReceivedToday);
             const pendingOrdersCount = todayOrdersList.filter((o: any) => o.paymentStatus !== 'Received' && o.payment_status !== 'Received').length;
 
+            const modeLabel = dailyDateFilterType === 'pickup' 
+              ? 'Pickups' 
+              : (dailyDateFilterType === 'delivery' ? 'Deliveries' : 'Orders');
+
             return (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Header Title & Export Actions */}
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
                   <div>
-                    <h3 className="text-4xl font-black tracking-tight">
-                      {isTodaySelected ? "Today's Orders" : `Orders for ${displayDateStr}`}
+                    <h3 className="text-4xl font-black tracking-tight flex items-center gap-2 flex-wrap">
+                      <span>{isTodaySelected ? `Today's ${modeLabel}` : `${modeLabel} for ${displayDateStr}`}</span>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                        {dailyDateFilterType === 'pickup' ? '📦 Filtered by Pickup Date' : (dailyDateFilterType === 'delivery' ? '🚚 Filtered by Delivery Date' : '📅 Filtered by Booking Date')}
+                      </span>
                     </h3>
                     <p className="text-text-secondary text-sm mt-1">
                       {isTodaySelected 
-                        ? `Orders & payments for today (${displayDateStr})` 
-                        : `Orders & payments for ${formattedLongDate}`}
+                        ? `Tracking orders, pickup/delivery schedules & rate card realization for today (${displayDateStr})` 
+                        : `Tracking orders & rate card realization for ${formattedLongDate}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
@@ -3954,152 +4297,217 @@ Thank you for trusting *Laundry Basket*. ❤️
                   </div>
                 </div>
 
-                {/* Interactive Date Filter Bar */}
-                <div className="glass p-3.5 rounded-3xl border border-black/5 bg-white/70 shadow-sm flex flex-wrap items-center justify-between gap-3 mb-6">
-                  {/* Left: Quick Date Navigation & Calendar Picker */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center bg-black/5 p-1 rounded-2xl">
-                      <button
-                        onClick={() => changeDailyDateBy(-1)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-                        title="View previous day"
-                      >
-                        <span>◀</span> Prev Day
-                      </button>
-                      
-                      <div className="relative flex items-center mx-1.5">
-                        <input
-                          type="date"
-                          value={selectedDailyDate}
-                          onChange={(e) => {
-                            if (e.target.value) setSelectedDailyDate(e.target.value);
-                          }}
-                          className="bg-white border border-black/10 text-text-primary px-3 py-1.5 rounded-xl text-xs font-black outline-none focus:border-primary shadow-sm cursor-pointer"
-                        />
+                {/* Interactive Date & Filter Mode Toolbar */}
+                <div className="glass p-4 rounded-3xl border border-black/5 bg-white/70 shadow-sm flex flex-col gap-3 mb-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Left: Quick Date Navigation & Calendar Picker */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center bg-black/5 p-1 rounded-2xl">
+                        <button
+                          onClick={() => changeDailyDateBy(-1)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                          title="View previous day"
+                        >
+                          <span>◀</span> Prev Day
+                        </button>
+                        
+                        <div className="relative flex items-center mx-1.5">
+                          <input
+                            type="date"
+                            value={selectedDailyDate}
+                            onChange={(e) => {
+                              if (e.target.value) setSelectedDailyDate(e.target.value);
+                            }}
+                            className="bg-white border border-black/10 text-text-primary px-3 py-1.5 rounded-xl text-xs font-black outline-none focus:border-primary shadow-sm cursor-pointer"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => changeDailyDateBy(1)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                          title="View next day"
+                        >
+                          Next Day <span>▶</span>
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => changeDailyDateBy(1)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-                        title="View next day"
-                      >
-                        Next Day <span>▶</span>
-                      </button>
+                      {/* Quick Presets: Today & Yesterday */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={jumpToToday}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                            isTodaySelected
+                              ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
+                              : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
+                          }`}
+                        >
+                          Today
+                        </button>
+                        <button
+                          onClick={jumpToYesterday}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                            isYesterdaySelected
+                              ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
+                              : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
+                          }`}
+                        >
+                          Yesterday
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Quick Presets: Today & Yesterday */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={jumpToToday}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                          isTodaySelected
-                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
-                            : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
-                        }`}
-                      >
-                        Today
-                      </button>
-                      <button
-                        onClick={jumpToYesterday}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                          isYesterdaySelected
-                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
-                            : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
-                        }`}
-                      >
-                        Yesterday
-                      </button>
+                    {/* Right: Date Status Indicator & Reset */}
+                    <div className="flex items-center gap-2">
+                      {isTodaySelected ? (
+                        <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-800 border border-emerald-500/25 flex items-center gap-2 shadow-sm">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Live Today ({displayDateStr})
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-800 border border-blue-500/25 flex items-center gap-2 shadow-sm">
+                            <span>📅</span>
+                            Selected: {formattedLongDate}
+                          </span>
+                          <button
+                            onClick={jumpToToday}
+                            className="px-3 py-1.5 rounded-xl text-xs font-black text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer"
+                          >
+                            Back to Today
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Right: Date Status Indicator & Reset */}
-                  <div className="flex items-center gap-2">
-                    {isTodaySelected ? (
-                      <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-800 border border-emerald-500/25 flex items-center gap-2 shadow-sm">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Live Today ({displayDateStr})
+                  {/* Date Mode Filter: Placed Date | Pickup Date | Delivery Date */}
+                  <div className="flex items-center justify-between border-t border-black/5 pt-2.5 flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-secondary mr-1">
+                        View Orders By Date Type:
                       </span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-800 border border-blue-500/25 flex items-center gap-2 shadow-sm">
-                          <span>📅</span>
-                          Selected: {formattedLongDate}
-                        </span>
+                      {(['placed', 'pickup', 'delivery'] as const).map(type => (
                         <button
-                          onClick={jumpToToday}
-                          className="px-3 py-1.5 rounded-xl text-xs font-black text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer"
+                          key={type}
+                          onClick={() => setDailyDateFilterType(type)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 border ${
+                            dailyDateFilterType === type
+                              ? 'bg-primary text-white border-primary shadow-md shadow-primary/20 scale-105'
+                              : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
+                          }`}
                         >
-                          Back to Today
+                          <span>{type === 'placed' ? '📅' : (type === 'pickup' ? '📦' : '🚚')}</span>
+                          <span>{type === 'placed' ? 'Placed Date' : (type === 'pickup' ? 'Pickup Date' : 'Delivery Date')}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                            dailyDateFilterType === type ? 'bg-white/20 text-white' : 'bg-black/5 text-text-secondary'
+                          }`}>
+                            {orders.filter(o => isOrderOnDateWithType(o, selectedDailyDate, type)).length}
+                          </span>
                         </button>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+
+                    <div className="text-[10px] text-text-secondary font-medium">
+                      💡 Tip: Click on any row's 📅 Pickup or 🚚 Delivery date to edit inline and save instantly.
+                    </div>
                   </div>
                 </div>
 
-                {/* 3 KPI Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  {/* Card 1: Today's Orders / Total Booked */}
-                  <div className="glass p-6 rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-primary tracking-widest">
-                        {isTodaySelected ? "Today's Total Booked" : "Total Booked"}
-                      </p>
-                      <span className="text-xl">📦</span>
+                {/* 4 KPI Summary Cards (Including Rate Realization & Leakage) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  {/* Card 1: Total Booked (Actual) */}
+                  <div className="glass p-5 rounded-3xl border border-primary/20 bg-primary/5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-black uppercase text-primary tracking-widest">
+                          {isTodaySelected ? "Today's Total Booked" : "Total Booked"}
+                        </p>
+                        <span className="text-xl">📦</span>
+                      </div>
+                      <p className="text-3xl font-black text-text-primary">₹{totalRevenueToday}</p>
                     </div>
-                    <p className="text-3xl font-black text-text-primary">₹{totalRevenueToday}</p>
-                    <p className="text-xs text-text-secondary font-medium mt-1">
-                      {totalOrdersCount} orders placed {isTodaySelected ? 'today' : `on ${displayDateStr}`}
+                    <p className="text-xs text-text-secondary font-medium mt-2">
+                      {totalOrdersCount} orders {dailyDateFilterType === 'pickup' ? 'scheduled for pickup' : (dailyDateFilterType === 'delivery' ? 'scheduled for delivery' : 'placed')}
                     </p>
                   </div>
 
-                  {/* Card 2: Today's Received Amount */}
-                  <div className="glass p-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-emerald-700 tracking-widest">
-                        {isTodaySelected ? "Today's Received Amount" : "Received Amount"}
-                      </p>
-                      <span className="text-xl">💰</span>
+                  {/* Card 2: Rate Card Potential & Realization */}
+                  <div className="glass p-5 rounded-3xl border border-indigo-500/25 bg-indigo-500/10 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-black uppercase text-indigo-700 tracking-widest">
+                          Max Rate List Potential
+                        </p>
+                        <span className="text-xl">💎</span>
+                      </div>
+                      <p className="text-3xl font-black text-indigo-900">₹{totalRateCardPotential}</p>
                     </div>
-                    <p className="text-3xl font-black text-emerald-800">₹{totalReceivedToday}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-800 border border-emerald-600/20">
+                    <div className="mt-2">
+                      {totalVarianceToday > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                          ⚠️ -₹{totalVarianceToday} gap ({discountedOrdersCount} cx undercharged)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-900 border border-emerald-500/30">
+                          ✅ 100% Rate Card Matched
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Received Amount */}
+                  <div className="glass p-5 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-black uppercase text-emerald-700 tracking-widest">
+                          Received Amount
+                        </p>
+                        <span className="text-xl">💰</span>
+                      </div>
+                      <p className="text-3xl font-black text-emerald-800">₹{totalReceivedToday}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-800 border border-emerald-600/20">
                         Cash: ₹{cashReceivedToday}
                       </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-600/15 text-blue-800 border border-blue-600/20">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-600/15 text-blue-800 border border-blue-600/20">
                         Online QR: ₹{onlineReceivedToday}
                       </span>
                     </div>
                   </div>
 
-                  {/* Card 3: Today's Pending Collection */}
-                  <div className="glass p-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-amber-700 tracking-widest">
-                        {isTodaySelected ? "Today's Pending Collection" : "Pending Collection"}
-                      </p>
-                      <span className="text-xl">⏳</span>
+                  {/* Card 4: Pending Collection */}
+                  <div className="glass p-5 rounded-3xl border border-amber-500/30 bg-amber-500/10 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-black uppercase text-amber-700 tracking-widest">
+                          Pending Collection
+                        </p>
+                        <span className="text-xl">⏳</span>
+                      </div>
+                      <p className="text-3xl font-black text-amber-800">₹{pendingRevenueToday}</p>
                     </div>
-                    <p className="text-3xl font-black text-amber-800">₹{pendingRevenueToday}</p>
-                    <p className="text-xs text-amber-700/80 font-medium mt-1">
+                    <p className="text-xs text-amber-700/80 font-medium mt-2">
                       {pendingOrdersCount} orders pending payment
                     </p>
                   </div>
                 </div>
 
-                {/* Table with interactive payment toggles */}
-                <div className="glass overflow-hidden rounded-3xl border border-black/5">
+                {/* Table with interactive payment toggles, date pickers, and rate comparisons */}
+                <div className="glass overflow-hidden rounded-3xl border border-black/5 shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="border-b border-black/5 bg-white/50">
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Order ID</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Customer</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Service</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Status</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Amount</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Status</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Mode</th>
-                          <th className="p-4 text-[10px] font-black uppercase text-text-secondary tracking-widest text-right">Action</th>
+                        <tr className="border-b border-black/5 bg-white/70">
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Order ID</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Customer</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Pickup & Delivery Dates</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Services</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Status</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Rate Card vs Billed</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Status</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest">Payment Mode</th>
+                          <th className="p-3.5 text-[10px] font-black uppercase text-text-secondary tracking-widest text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4107,13 +4515,11 @@ Thank you for trusting *Laundry Basket*. ❤️
                           Array.from({ length: 5 }).map((_, i) => (
                             <tr key={`skeleton-${i}`} className="border-b border-black/5 animate-pulse">
                               <td className="p-4"><div className="h-4 bg-black/10 rounded w-20"></div></td>
-                              <td className="p-4">
-                                <div className="h-4 bg-black/10 rounded w-32 mb-2"></div>
-                                <div className="h-3 bg-black/5 rounded w-24"></div>
-                              </td>
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-32 mb-2"></div><div className="h-3 bg-black/5 rounded w-24"></div></td>
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-28"></div></td>
                               <td className="p-4"><div className="h-4 bg-black/10 rounded w-24"></div></td>
                               <td className="p-4"><div className="h-6 bg-black/10 rounded-full w-20"></div></td>
-                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-16"></div></td>
+                              <td className="p-4"><div className="h-4 bg-black/10 rounded w-24"></div></td>
                               <td className="p-4"><div className="h-6 bg-black/10 rounded-full w-24"></div></td>
                               <td className="p-4"><div className="h-6 bg-black/10 rounded w-20"></div></td>
                               <td className="p-4 text-right"><div className="h-4 bg-black/10 rounded w-16 ml-auto"></div></td>
@@ -4122,20 +4528,125 @@ Thank you for trusting *Laundry Basket*. ❤️
                         ) : todayOrdersList.map((o: any) => {
                           const paymentStatus = (o.paymentStatus === 'Received' || o.payment_status === 'Received') ? 'Received' : 'Pending';
                           const paymentMode = o.paymentMode || o.payment_mode || 'Cash';
+                          const analysis = ordersAnalysisMap.get(o.id) || computeOrderRateAnalysis(o, rates);
+                          const pickupDateVal = toInputDateValue(getOrderPickupDate(o));
+                          const deliveryDateVal = toInputDateValue(getOrderDeliveryDate(o));
+
                           return (
-                            <tr key={o.id} className="border-b border-black/5 hover:bg-white/40 transition-colors">
-                              <td className="p-4 font-black text-sm text-primary">{o.id}</td>
-                              <td className="p-4">
-                                <div className="font-bold text-sm text-text-primary">{o.name}</div>
-                                <div className="text-[10px] text-text-secondary">{o.phone}</div>
+                            <tr key={o.id} className="border-b border-black/5 hover:bg-white/50 transition-colors">
+                              {/* 1. Order ID */}
+                              <td className="p-3.5 font-black text-xs text-primary align-top">
+                                <div className="flex flex-col gap-1">
+                                  <span>#{o.id}</span>
+                                  <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-black/5 text-text-secondary w-fit">
+                                    {o.source || 'Web'}
+                                  </span>
+                                </div>
                               </td>
-                              <td className="p-4 text-sm text-text-secondary">{o.services?.[0] || 'Wash & Iron'}</td>
-                              <td className="p-4">
-                                <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-black/5">{o.status}</span>
+
+                              {/* 2. Customer */}
+                              <td className="p-3.5 align-top">
+                                <div className="font-bold text-xs text-text-primary leading-tight">{o.name || o.customer_name || 'Customer'}</div>
+                                <div className="text-[10px] text-text-secondary font-mono mt-0.5">{o.phone || o.mobile_number}</div>
+                                {o.address && (
+                                  <div className="text-[9px] text-text-secondary truncate max-w-[140px] mt-0.5" title={o.address}>
+                                    📍 {o.address}
+                                  </div>
+                                )}
                               </td>
-                              <td className="p-4 font-black text-sm text-text-primary">₹{o.total}</td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl w-fit">
+
+                              {/* 3. Pickup & Delivery Dates (Inline editable) */}
+                              <td className="p-3.5 align-top">
+                                <div className="flex flex-col gap-1.5 min-w-[130px]">
+                                  {/* Pickup Date Input */}
+                                  <div className="flex items-center gap-1" title="Pickup Date">
+                                    <span className="text-xs">📅</span>
+                                    <input
+                                      type="date"
+                                      value={pickupDateVal}
+                                      onChange={(e) => handleQuickUpdateDates(o.id, e.target.value, deliveryDateVal)}
+                                      className="bg-white/80 border border-black/10 rounded-lg px-2 py-0.5 text-[10px] font-black text-text-primary outline-none focus:border-primary shadow-xs cursor-pointer w-full"
+                                    />
+                                  </div>
+
+                                  {/* Delivery Date Input */}
+                                  <div className="flex items-center gap-1" title="Delivery Date">
+                                    <span className="text-xs">🚚</span>
+                                    <input
+                                      type="date"
+                                      value={deliveryDateVal}
+                                      onChange={(e) => handleQuickUpdateDates(o.id, pickupDateVal, e.target.value)}
+                                      className={`bg-white/80 border rounded-lg px-2 py-0.5 text-[10px] font-black outline-none focus:border-primary shadow-xs cursor-pointer w-full ${
+                                        !deliveryDateVal ? 'border-amber-400 text-amber-800' : 'border-black/10 text-text-primary'
+                                      }`}
+                                    />
+                                  </div>
+
+                                  {!deliveryDateVal && (
+                                    <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded w-fit">
+                                      ⚠️ Delivery date not set
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* 4. Services */}
+                              <td className="p-3.5 text-xs text-text-secondary align-top max-w-[180px]">
+                                <div className="font-medium truncate" title={Array.isArray(o.services) ? o.services.join(', ') : o.services}>
+                                  {o.services?.[0] || 'Standard Service'}
+                                </div>
+                                {Array.isArray(o.services) && o.services.length > 1 && (
+                                  <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.2 rounded mt-1 inline-block">
+                                    +{o.services.length - 1} more items
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* 5. Status */}
+                              <td className="p-3.5 align-top">
+                                <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-black/5 inline-block">
+                                  {o.status}
+                                </span>
+                              </td>
+
+                              {/* 6. Rate Card vs Billed (Exact Rate Realization) */}
+                              <td className="p-3.5 align-top">
+                                <div className="flex flex-col gap-1 min-w-[140px]">
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[9px] font-bold text-text-secondary uppercase">Rate Card:</span>
+                                    <span className="text-xs font-bold text-slate-700">₹{analysis.maxPossible}</span>
+                                  </div>
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[9px] font-bold text-text-secondary uppercase">Billed:</span>
+                                    <span className="text-sm font-black text-primary">₹{o.total}</span>
+                                  </div>
+                                  <div>
+                                    {analysis.variance === 0 ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-emerald-500/15 text-emerald-800 border border-emerald-500/20">
+                                        ✅ Full Rate Card
+                                      </span>
+                                    ) : analysis.variance > 0 ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20">
+                                        ⚠️ Gap: -₹{analysis.variance} (-{analysis.variancePct}%)
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-blue-500/15 text-blue-800 border border-blue-500/20">
+                                        🔥 Premium: +₹{Math.abs(analysis.variance)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => setRateBreakdownOrder(o)}
+                                    className="text-[9px] font-black text-primary hover:underline text-left mt-0.5 cursor-pointer flex items-center gap-0.5"
+                                  >
+                                    <span>🔍 View Exact Rates</span>
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* 7. Payment Status */}
+                              <td className="p-3.5 align-top">
+                                <div className="flex items-center gap-1 bg-black/5 p-1 rounded-xl w-fit">
                                   {(['Pending', 'Received'] as const).map(option => (
                                     <button
                                       key={option}
@@ -4156,7 +4667,9 @@ Thank you for trusting *Laundry Basket*. ❤️
                                   ))}
                                 </div>
                               </td>
-                              <td className="p-4">
+
+                              {/* 8. Payment Mode */}
+                              <td className="p-3.5 align-top">
                                 <select
                                   value={paymentMode}
                                   onChange={(e) => updatePayment(o, paymentStatus, e.target.value)}
@@ -4167,20 +4680,32 @@ Thank you for trusting *Laundry Basket*. ❤️
                                   ))}
                                 </select>
                               </td>
-                              <td className="p-4 text-right">
-                                <button
-                                  onClick={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
-                                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
-                                >
-                                  View Details
-                                </button>
+
+                              {/* 9. Action */}
+                              <td className="p-3.5 text-right align-top">
+                                <div className="flex flex-col items-end gap-1.5">
+                                  <button
+                                    onClick={() => { setSelectedOrder(o); setShowInvoiceModal(true); }}
+                                    className="text-[10px] font-black text-primary uppercase tracking-wider hover:underline cursor-pointer"
+                                  >
+                                    View Details
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartEditOrder(o)}
+                                    className="text-[9px] font-bold text-text-secondary hover:text-primary uppercase tracking-wider cursor-pointer"
+                                  >
+                                    ✏️ Edit
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
                         })}
                         {!loading && todayOrdersList.length === 0 && (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-text-secondary text-sm font-medium">No orders recorded for {displayDateStr}.</td>
+                            <td colSpan={9} className="p-8 text-center text-text-secondary text-sm font-medium">
+                              No {modeLabel.toLowerCase()} recorded for {displayDateStr}.
+                            </td>
                           </tr>
                         )}
                       </tbody>
@@ -4896,6 +5421,27 @@ Thank you for trusting *Laundry Basket*. ❤️
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4 mb-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">📅 Pickup Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 text-xs font-black outline-none focus:border-primary transition-colors cursor-pointer"
+                      value={walkinForm.pickup_date || getTodayKolkataIso()}
+                      onChange={e => setWalkinForm({ ...walkinForm, pickup_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">🚚 Expected Delivery Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 text-xs font-black outline-none focus:border-primary transition-colors cursor-pointer"
+                      value={walkinForm.delivery_date || shiftIsoDate(getTodayKolkataIso(), 2)}
+                      onChange={e => setWalkinForm({ ...walkinForm, delivery_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-2 py-2">
                   <input
                     type="checkbox"
@@ -5251,6 +5797,27 @@ Thank you for trusting *Laundry Basket*. ❤️
                       <option value="WS">WS · Website Directly</option>
                       <option value="AP">AP · App Directly</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">📅 Pickup Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 text-xs font-black outline-none focus:border-primary transition-colors cursor-pointer"
+                      value={editOrderForm.pickup_date || ''}
+                      onChange={e => setEditOrderForm({ ...editOrderForm, pickup_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-text-secondary ml-1">🚚 Delivery Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-white/50 border border-black/5 rounded-2xl px-4 py-2.5 text-xs font-black outline-none focus:border-primary transition-colors cursor-pointer"
+                      value={editOrderForm.delivery_date || ''}
+                      onChange={e => setEditOrderForm({ ...editOrderForm, delivery_date: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -5731,6 +6298,138 @@ Thank you for trusting *Laundry Basket*. ❤️
         )}
 
 
+
+        {/* Rate Breakdown & Revenue Leakage Modal */}
+        {rateBreakdownOrder && (() => {
+          const analysis = computeOrderRateAnalysis(rateBreakdownOrder, rates);
+          return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="glass-card bg-white w-full max-w-2xl overflow-hidden p-0 shadow-2xl rounded-3xl max-h-[90vh] flex flex-col border border-black/10">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-6 text-white relative">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-[3px] text-blue-300">Rate Card & Revenue Analysis</span>
+                      <h3 className="text-2xl font-black mt-1 flex items-center gap-2">
+                        <span>#{analysis.orderId}</span>
+                        <span className="text-sm font-bold text-white/70">· {analysis.customerName}</span>
+                      </h3>
+                      <p className="text-xs text-blue-200/80 mt-1">
+                        📅 Pickup: {formatDisplayDate(getOrderPickupDate(rateBreakdownOrder))} | 🚚 Delivery: {formatDisplayDate(getOrderDeliveryDate(rateBreakdownOrder))}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setRateBreakdownOrder(null)}
+                      className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold transition-colors cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* 3 Summary Badges */}
+                  <div className="grid grid-cols-3 gap-3 mt-5">
+                    <div className="bg-white/10 rounded-2xl p-3 border border-white/10 backdrop-blur-xs">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">Max Rate Possible</span>
+                      <span className="text-xl font-black text-white">₹{analysis.maxPossible}</span>
+                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Based on Rate List</span>
+                    </div>
+                    <div className="bg-white/10 rounded-2xl p-3 border border-white/10 backdrop-blur-xs">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-blue-200 block">Actual Billed</span>
+                      <span className="text-xl font-black text-white">₹{analysis.actualCharged}</span>
+                      <span className="text-[9px] text-blue-200/70 block mt-0.5">Final Order Total</span>
+                    </div>
+                    <div className={`rounded-2xl p-3 border backdrop-blur-xs ${
+                      analysis.variance === 0 
+                        ? 'bg-emerald-500/20 border-emerald-400/30' 
+                        : analysis.variance > 0 
+                          ? 'bg-amber-500/20 border-amber-400/30' 
+                          : 'bg-blue-500/20 border-blue-400/30'
+                    }`}>
+                      <span className="text-[9px] font-black uppercase tracking-wider text-white/90 block">
+                        {analysis.variance === 0 ? 'Variance' : analysis.variance > 0 ? 'Discount / Leakage' : 'Premium Charged'}
+                      </span>
+                      <span className="text-xl font-black text-white">
+                        {analysis.variance === 0 ? '₹0 (100%)' : analysis.variance > 0 ? `-₹${analysis.variance} (-${analysis.variancePct}%)` : `+₹${Math.abs(analysis.variance)}`}
+                      </span>
+                      <span className="text-[9px] text-white/80 block mt-0.5">
+                        {analysis.variance === 0 ? 'Exact Rate Card Match' : analysis.variance > 0 ? 'Undercharged vs standard' : 'Charged above standard'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items Breakdown Table */}
+                <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-secondary mb-3 flex items-center justify-between">
+                    <span>Item-by-Item Rate Comparison</span>
+                    <span>{analysis.items.length} items recorded</span>
+                  </h4>
+
+                  <div className="overflow-x-auto rounded-2xl border border-black/5 bg-slate-50/50">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-black/5 bg-black/5 text-[9px] font-black uppercase tracking-wider text-text-secondary">
+                          <th className="p-3">Service & Item</th>
+                          <th className="p-3 text-center">Qty</th>
+                          <th className="p-3 text-right">Standard Rate</th>
+                          <th className="p-3 text-right">Billed Rate</th>
+                          <th className="p-3 text-right">Max Total</th>
+                          <th className="p-3 text-right">Billed Total</th>
+                          <th className="p-3 text-right">Variance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/5">
+                        {analysis.items.map((it, idx) => (
+                          <tr key={idx} className="hover:bg-white/80 transition-colors">
+                            <td className="p-3">
+                              <span className="font-bold text-text-primary block">{it.name}</span>
+                              {it.isCustom && <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-black uppercase">Custom Item</span>}
+                            </td>
+                            <td className="p-3 text-center font-black">{it.qty}</td>
+                            <td className="p-3 text-right font-semibold text-text-secondary">
+                              {it.cardUnitPrice ? `₹${it.cardUnitPrice}` : <span className="text-slate-400">Custom</span>}
+                            </td>
+                            <td className="p-3 text-right font-black text-text-primary">
+                              ₹{it.chargedUnitPrice.toFixed(0)}
+                            </td>
+                            <td className="p-3 text-right font-bold text-slate-700">
+                              ₹{it.maxItemTotal}
+                            </td>
+                            <td className="p-3 text-right font-black text-primary">
+                              ₹{it.chargedPrice}
+                            </td>
+                            <td className="p-3 text-right font-black">
+                              {it.diff === 0 ? (
+                                <span className="text-emerald-600">₹0</span>
+                              ) : it.diff > 0 ? (
+                                <span className="text-amber-600">-₹{it.diff}</span>
+                              ) : (
+                                <span className="text-blue-600">+₹{Math.abs(it.diff)}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-black/5 bg-slate-50 flex justify-between items-center">
+                  <span className="text-[10px] text-text-secondary font-medium">
+                    Verified against Laundry Basket Global Master Rate List (559 rates)
+                  </span>
+                  <button
+                    onClick={() => setRateBreakdownOrder(null)}
+                    className="btn-primary px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Invoice Modal */}
         {showInvoiceModal && selectedOrder && (
@@ -6776,6 +7475,14 @@ function OrderCard({ order, riders, onAssign, onUpdate, onView, onPrint, onPdf, 
       <div className="mb-2.5">
         <p className="text-xs font-bold text-text-primary line-clamp-1">{order.services}</p>
         <p className="text-[10px] text-text-secondary mt-0.5 font-medium">{order.name} · {order.phone}</p>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[9px] font-bold text-text-secondary order-card-dates">
+          <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+            📅 {formatDisplayDate(getOrderPickupDate(order))}
+          </span>
+          <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+            🚚 {formatDisplayDate(getOrderDeliveryDate(order)) || 'Pending Del'}
+          </span>
+        </div>
       </div>
 
       {/* Pickup/Delivery OTP Section - Hidden for Walk-in & WhatsApp */}

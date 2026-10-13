@@ -565,6 +565,9 @@ const OrderSchema = new mongoose.Schema({
     delivery_person: String,
     delivery_status: String,
     delivery_date: String,
+    deliveryDate: String,
+    pickup_date: String,
+    pickupDate: String,
     delivery_mode: String,
     payment_status: String,
     payment_mode: String,
@@ -2049,6 +2052,10 @@ app.post('/api/orders', async (req, res) => {
             phone: String(req.body.phone || req.body.mobile_number || ''),
             customer_id: req.body.customer_id || orderId,
             order_date: req.body.order_date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+            pickup_date: req.body.pickup_date || req.body.pickupDate || req.body.order_date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+            pickupDate: req.body.pickup_date || req.body.pickupDate || req.body.order_date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+            delivery_date: req.body.delivery_date || req.body.deliveryDate || null,
+            deliveryDate: req.body.delivery_date || req.body.deliveryDate || null,
         };
 
         // Collision-proof saving with automatic retry if duplicate key occurs
@@ -2225,6 +2232,16 @@ app.put('/api/orders/:id', verifyToken, async (req, res) => {
         if (req.body.customer_name && !req.body.name) updateData.name = req.body.customer_name;
         if (req.body.phone && !req.body.mobile_number) updateData.mobile_number = String(req.body.phone);
         if (req.body.mobile_number && !req.body.phone) updateData.phone = String(req.body.mobile_number);
+        if (req.body.pickup_date || req.body.pickupDate) {
+            const p = req.body.pickup_date || req.body.pickupDate;
+            updateData.pickup_date = p;
+            updateData.pickupDate = p;
+        }
+        if (req.body.delivery_date !== undefined || req.body.deliveryDate !== undefined) {
+            const d = req.body.delivery_date !== undefined ? req.body.delivery_date : req.body.deliveryDate;
+            updateData.delivery_date = d;
+            updateData.deliveryDate = d;
+        }
         if (req.body.total !== undefined) {
             const newTotal = Number(req.body.total) || 0;
             updateData.total = newTotal;
