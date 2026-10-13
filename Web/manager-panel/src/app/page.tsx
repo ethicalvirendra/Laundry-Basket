@@ -2772,13 +2772,41 @@ Thank you for trusting *Laundry Basket*. ❤️
           <header className="manager-header flex justify-between items-center mb-10">
             <div>
               <h2 className="manager-page-title text-4xl font-black tracking-tight">
-                {activeTab === 'source-reports' ? 'Source Reports & Marketing ROI' : 'Store Operations'}
+                {activeTab === 'orders' ? 'Store Operations' :
+                 activeTab === 'today' ? "Today's Orders" :
+                 activeTab === 'riders' ? 'Rider Fleet' :
+                 activeTab === 'rates' ? 'Rate List' :
+                 activeTab === 'earnings' ? 'Order History & Earnings' :
+                 activeTab === 'source-reports' ? 'Source Reports & Marketing ROI' :
+                 activeTab === 'business-stats' ? 'Business Statistics' :
+                 activeTab === 'inventory' ? 'Inventory Management' :
+                 activeTab === 'support' ? 'Support & System Health' :
+                 activeTab === 'reviews' ? 'Customer Reviews' : 'Store Operations'}
               </h2>
               <div className="flex flex-wrap items-center gap-3 mt-2">
                 {activeTab === 'source-reports' ? (
-                  <span className="bg-purple-500/10 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full uppercase">Channel Attribution & Conversion Analytics</span>
+                  <span className="bg-purple-500/10 text-purple-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Channel Attribution & Conversion Analytics</span>
+                ) : activeTab === 'today' ? (
+                  <>
+                    <span className="bg-primary/10 text-primary text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      {dailyDateFilterType === 'pickup' ? '📦 Filtered by Pickup Date' : (dailyDateFilterType === 'delivery' ? '🚚 Filtered by Delivery Date' : '📅 Filtered by Booking Date')}
+                    </span>
+                    <span className="text-text-secondary text-xs font-medium">Tracking orders, schedules & rate card realization</span>
+                  </>
+                ) : activeTab === 'riders' ? (
+                  <span className="bg-blue-500/10 text-blue-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{riders.length} Delivery Partners</span>
+                ) : activeTab === 'rates' ? (
+                  <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{rates.length} Master Items Synchronized</span>
+                ) : activeTab === 'earnings' ? (
+                  <span className="bg-purple-500/10 text-purple-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Live & Imported Orders</span>
+                ) : activeTab === 'business-stats' ? (
+                  <span className="bg-indigo-500/10 text-indigo-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Store Performance & Trends</span>
+                ) : activeTab === 'inventory' ? (
+                  <span className="bg-amber-500/10 text-amber-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{inventory.length} Tracked Items</span>
+                ) : activeTab === 'reviews' ? (
+                  <span className="bg-yellow-500/10 text-yellow-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{reviews.length} Reviews</span>
                 ) : (
-                  <span className="bg-red-500/10 text-red-600 text-[10px] font-black px-2 py-1 rounded-full uppercase">{categorizedOrders.pending.length} Pending Pickups</span>
+                  <span className="bg-red-500/10 text-red-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{categorizedOrders.pending.length} Pending Pickups</span>
                 )}
                 <span className="text-text-secondary text-xs font-medium uppercase tracking-widest">Manager ID: {managerId}</span>
               </div>
@@ -2825,17 +2853,19 @@ Thank you for trusting *Laundry Basket*. ❤️
                 </div>
               )}
               {(activeTab === 'orders' || activeTab === 'today') && (
-                <button className="btn-primary shadow-lg shadow-primary/20 px-6 py-4 rounded-2xl flex items-center gap-2" onClick={() => setShowWalkinModal(true)}>
-                  <span className="text-xl">+</span> Walk-in
-                </button>
+                <>
+                  <button className="btn-primary shadow-lg shadow-primary/20 px-6 py-4 rounded-2xl flex items-center gap-2 cursor-pointer" onClick={() => setShowWalkinModal(true)}>
+                    <span className="text-xl">+</span> Walk-in
+                  </button>
+                  <button 
+                    className="btn-primary bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-none shadow-lg shadow-emerald-500/20 px-5 py-4 rounded-2xl flex items-center gap-2 text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    onClick={() => setShowEODModal(true)}
+                    title="View & Export Complete Daily Report (PDF & Excel)"
+                  >
+                    <span className="text-base">📊</span> Export Daily Report
+                  </button>
+                </>
               )}
-              <button 
-                className="btn-primary bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-none shadow-lg shadow-emerald-500/20 px-5 py-4 rounded-2xl flex items-center gap-2 text-white font-black text-xs uppercase tracking-wider transition-all"
-                onClick={() => setShowEODModal(true)}
-                title="View & Export End of Day Graphic Report"
-              >
-                <span className="text-base">📊</span> Export EOD Report
-              </button>
             </div>
           </header>
 
@@ -2959,19 +2989,13 @@ Thank you for trusting *Laundry Basket*. ❤️
 
           {activeTab === 'earnings' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="manager-section-header flex justify-between items-center mb-8">
-                <div>
-                  <h3 className="text-4xl font-black tracking-tight">Order History</h3>
-                  <p className="text-text-secondary text-sm mt-1">All orders for this branch — live &amp; imported from Excel</p>
-                </div>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="Search orders (ID, Name, Phone, Items, Service, Status, Pickup Person...)" 
-                    className="glass px-6 py-3 text-xs outline-none focus:border-primary/40 transition-all rounded-2xl w-96 max-w-full font-bold"
-                    onChange={(e) => { setOrderSearch(e.target.value); setHistoryPage(1); }}
-                  />
-                </div>
+              <div className="flex justify-end items-center mb-6">
+                <input
+                  type="text"
+                  placeholder="Search orders (ID, Name, Phone, Items, Service, Status, Pickup Person...)" 
+                  className="glass px-6 py-3 text-xs outline-none focus:border-primary/40 transition-all rounded-2xl w-96 max-w-full font-bold shadow-sm"
+                  onChange={(e) => { setOrderSearch(e.target.value); setHistoryPage(1); }}
+                />
               </div>
 
               {/* Summary KPI Strip */}
@@ -4206,10 +4230,6 @@ Thank you for trusting *Laundry Basket*. ❤️
 
           {activeTab === 'business-stats' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="manager-section-header mb-8">
-                <h3 className="text-4xl font-black tracking-tight">Business Statistics</h3>
-                <p className="text-text-secondary text-sm mt-1">Detailed store performance, monthly trends, and revenue insights</p>
-              </div>
               <EarningsTrendGraph data={dailyEarningsData} />
             </div>
           )}
@@ -4265,38 +4285,6 @@ Thank you for trusting *Laundry Basket*. ❤️
 
             return (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Header Title & Export Actions */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                  <div>
-                    <h3 className="text-4xl font-black tracking-tight flex items-center gap-2 flex-wrap">
-                      <span>{isTodaySelected ? `Today's ${modeLabel}` : `${modeLabel} for ${displayDateStr}`}</span>
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        {dailyDateFilterType === 'pickup' ? '📦 Filtered by Pickup Date' : (dailyDateFilterType === 'delivery' ? '🚚 Filtered by Delivery Date' : '📅 Filtered by Booking Date')}
-                      </span>
-                    </h3>
-                    <p className="text-text-secondary text-sm mt-1">
-                      {isTodaySelected 
-                        ? `Tracking orders, pickup/delivery schedules & rate card realization for today (${displayDateStr})` 
-                        : `Tracking orders & rate card realization for ${formattedLongDate}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <button
-                      className="btn-primary bg-emerald-600 hover:bg-emerald-700 px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
-                      onClick={() => setShowEODModal(true)}
-                      title="View & Export Complete End of Day Graphic Report"
-                    >
-                      <span className="text-base">📊</span> Export EOD Report
-                    </button>
-                    <button
-                      className="btn-primary bg-green-600 hover:bg-green-700 px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
-                      onClick={exportTodayExcel}
-                    >
-                      <span className="text-base">📥</span> Export Excel
-                    </button>
-                  </div>
-                </div>
-
                 {/* Interactive Date & Filter Mode Toolbar */}
                 <div className="glass p-4 rounded-3xl border border-black/5 bg-white/70 shadow-sm flex flex-col gap-3 mb-6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4717,13 +4705,10 @@ Thank you for trusting *Laundry Basket*. ❤️
           })()}
           {activeTab === 'rates' && (
             <div className="animate-in fade-in zoom-in-95 duration-500">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-                <div>
-                  <h3 className="text-4xl font-black tracking-tighter">Rate List</h3>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest border border-primary/20 shadow-sm shadow-primary/10">Admin Controlled</span>
-                    <p className="text-xs text-text-secondary font-medium">Global pricing synchronized across all branches</p>
-                  </div>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                <div className="flex items-center gap-2">
+                  <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest border border-primary/20 shadow-sm shadow-primary/10">Admin Controlled</span>
+                  <p className="text-xs text-text-secondary font-medium">Global pricing synchronized across all branches</p>
                 </div>
                 <div className="flex gap-2 bg-white/40 p-1.5 rounded-2xl border border-white/50 shadow-inner">
                   {['All', 'Men', 'Women', 'Shoes', 'House Item', 'Bags'].map(cat => (
@@ -5072,8 +5057,6 @@ Thank you for trusting *Laundry Basket*. ❤️
           {activeTab === 'reviews' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="glass p-10">
-                <h3 className="text-3xl font-black mb-2 tracking-tight">Customer Reviews</h3>
-                <p className="text-xs font-black uppercase text-text-secondary tracking-widest mb-8">Feedback and ratings from completed orders</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {reviews.length === 0 ? (
