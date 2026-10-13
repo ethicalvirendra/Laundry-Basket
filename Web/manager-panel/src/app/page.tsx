@@ -515,6 +515,64 @@ const parseOrderServiceEntry = (s: any) => {
 
 const normalizeStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+const canonicalService = (st: string) => {
+  const s = normalizeStr(st);
+  if (!s) return '';
+  if (s === 'iron' || s === 'steamiron' || s === 'press') return 'steamiron';
+  if (s.includes('dry') || s === 'dc') return 'dryclean';
+  if (s.includes('wash') && s.includes('iron')) return 'washiron';
+  if (s === 'wash' || s === 'washonly') return 'washonly';
+  if (s.includes('roll')) return 'rollpress';
+  if (s.includes('shoe')) return 'shoecleaning';
+  return s;
+};
+
+const itemAliases: Record<string, string[]> = {
+  'pant': ['trouser', 'trousers', 'pant', 'pants', 'jeanstrouser'],
+  'pants': ['trouser', 'trousers', 'pant', 'pants', 'jeanstrouser'],
+  'trouser': ['trouser', 'pant', 'pants'],
+  'trousers': ['trouser', 'pant', 'pants'],
+  'lower': ['trackpant', 'pyjama', 'sweatpants', 'lower'],
+  'kurti': ['kurtaplain', 'kurta', 'kurti'],
+  'kurta': ['kurta', 'kurtaplain', 'kurti'],
+  'parda': ['curtains', 'curtain', 'parda'],
+  'curtain': ['curtains', 'curtain', 'parda'],
+  'curtains': ['curtains', 'curtain', 'parda'],
+  'dblanket': ['blanketdouble', 'blanket'],
+  'blanket': ['blanketdouble', 'blanketsingle', 'blanket'],
+  'tshirt': ['tshirt', 'shirt'],
+  'sofacoverbade': ['sofacover', 'cushioncover'],
+  'sofacoverchote': ['sofacover', 'cushioncover'],
+  'sofacover': ['sofacover', 'cushioncover'],
+  'coatset': ['coat', 'blazer', 'suit'],
+  'lehanga': ['lehenga', 'lehengacholi', 'skirt'],
+  'dupaata': ['dupatta', 'scarf'],
+  'gamcha': ['towel', 'gamcha']
+};
+
+function levenshteinDist(a: string, b: string): number {
+  const an = a ? a.length : 0;
+  const bn = b ? b.length : 0;
+  if (an === 0) return bn;
+  if (bn === 0) return an;
+  const matrix: number[][] = Array.from({ length: bn + 1 }, () => new Array(an + 1).fill(0));
+  for (let i = 0; i <= an; ++i) matrix[0][i] = i;
+  for (let i = 0; i <= bn; ++i) matrix[i][0] = i;
+  for (let i = 1; i <= bn; ++i) {
+    for (let j = 1; j <= an; ++j) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+        );
+      }
+    }
+  }
+  return matrix[bn][an];
+}
+
 const computeOrderRateAnalysis = (order: any, ratesList: any[] = []): OrderRateAnalysis => {
   const rawServices = Array.isArray(order?.services)
     ? order.services
@@ -549,13 +607,15 @@ const computeOrderRateAnalysis = (order: any, ratesList: any[] = []): OrderRateA
     let cardPrice: number | null = null;
 
     if (ratesList && ratesList.length > 0) {
-      // 1. Exact match by serviceType and item
-      if (normService && normItem) {
-        for (const r of ratesList) {
-          if (normalizeStr(r.serviceType) === normService && normalizeStr(r.item) === normItem) {
-            cardPrice = Number(r.price) || 0;
-            break;
-          }
+      const canonServ = canonicalService(serviceType);
+
+      // 1. Direct match with canonical service and item
+      for (const r of ratesList) {
+        const rServ = canonicalService(r.serviceType);
+        const rItem = normalizeStr(r.item);
+        if (rServ === canonServ && rItem === normItem) {
+          cardPrice = Number(r.price) || 0;
+          break;
         }
       }
 
@@ -571,16 +631,56 @@ const computeOrderRateAnalysis = (order: any, ratesList: any[] = []): OrderRateA
         }
       }
 
-      // 3. Substring match
+      // 3. Alias dictionary lookup (e.g. Pant -> Trouser, Lower -> Track Pant, etc.)
       if (cardPrice === null) {
-        for (const r of ratesList) {
-          const rItem = normalizeStr(r.item);
-          const rServ = normalizeStr(r.serviceType);
-          if (rItem && (normName.includes(rItem) || normItem.includes(rItem))) {
-            if (!normService || !rServ || normService === rServ || normName.includes(rServ)) {
+        const aliases = itemAliases[normItem] || [];
+        for (const alias of aliases) {
+          for (const r of ratesList) {
+            const rServ = canonicalService(r.serviceType);
+            const rItem = normalizeStr(r.item);
+            if ((!canonServ || rServ === canonServ) && (rItem === alias || rItem.includes(alias) || alias.includes(rItem))) {
               cardPrice = Number(r.price) || 0;
               break;
             }
+          }
+          if (cardPrice !== null) break;
+        }
+      }
+
+      // 4. Substring match within the same canonical service
+      if (cardPrice === null) {
+        for (const r of ratesList) {
+          const rServ = canonicalService(r.serviceType);
+          const rItem = normalizeStr(r.item);
+          if ((!canonServ || rServ === canonServ) && rItem && (normItem.includes(rItem) || rItem.includes(normItem))) {
+            cardPrice = Number(r.price) || 0;
+            break;
+          }
+        }
+      }
+
+      // 5. Fuzzy Levenshtein match for typos (e.g. bianket -> blanket, dupaata -> dupatta)
+      if (cardPrice === null && normItem.length >= 4) {
+        for (const r of ratesList) {
+          const rServ = canonicalService(r.serviceType);
+          const rItem = normalizeStr(r.item);
+          if (!canonServ || rServ === canonServ) {
+            const dist = levenshteinDist(normItem, rItem);
+            if (dist <= 2 || (normItem.includes('blanket') && rItem.includes('blanket')) || (normItem.includes('bedsheet') && rItem.includes('bedsheet'))) {
+              cardPrice = Number(r.price) || 0;
+              break;
+            }
+          }
+        }
+      }
+
+      // 6. Fallback match on item across ANY service if service was generic
+      if (cardPrice === null) {
+        for (const r of ratesList) {
+          const rItem = normalizeStr(r.item);
+          if (rItem === normItem || normItem.includes(rItem)) {
+            cardPrice = Number(r.price) || 0;
+            break;
           }
         }
       }
@@ -3006,10 +3106,16 @@ Thank you for trusting *Laundry Basket*. ❤️
                 const thirdPartyCharges = historyOrders.reduce((sum: number, o: any) => o.paidTo3rdPartyRider ? sum + (Number(o.deliveryFee || o.delivery_charges || 0)) : sum, 0);
 
                 return (
-                  <div className="manager-kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+                  <div className="manager-kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-6">
                     <div className="glass-card p-3.5 border-primary/10">
                       <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Total Orders</p>
                       <p className="text-xl font-black text-text-primary">{orderSummary.totalOrders.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="glass-card p-3.5 border-blue-500/10 bg-blue-500/[0.03]">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-blue-700 mb-1">💎 Rate List Potential</p>
+                      <p className="text-xl font-black text-blue-800">
+                        ₹{historyOrders.reduce((sum: number, o: any) => sum + computeOrderRateAnalysis(o, rates).maxPossible, 0).toLocaleString('en-IN')}
+                      </p>
                     </div>
                     <div className="glass-card p-3.5 border-orange-500/10">
                       <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary mb-1">Pending Payments</p>
@@ -3267,7 +3373,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                     <tr className="text-[8px] font-black uppercase tracking-widest">
                       <th colSpan={4} className="px-4 pt-4 pb-2 bg-blue-500/10 text-blue-700 border-r-2 border-white/60 text-center">👤 Customer Details</th>
                       <th colSpan={5} className="px-4 pt-4 pb-2 bg-violet-500/10 text-violet-700 border-r-2 border-white/60 text-center">📦 Order &amp; Item Details</th>
-                      <th colSpan={4} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Payment &amp; Amount</th>
+                      <th colSpan={5} className="px-4 pt-4 pb-2 bg-emerald-500/10 text-emerald-700 border-r-2 border-white/60 text-center">💳 Payment &amp; Rate Comparison</th>
                       <th colSpan={1} className="px-4 pt-4 pb-2 bg-red-500/10 text-red-700 text-center">⚡ Actions</th>
                     </tr>
                     <tr className="border-b-2 border-black/5 text-[9px] font-black uppercase tracking-widest text-text-secondary">
@@ -3335,6 +3441,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                         </div>
                       </th>
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Total Amount</th>
+                      <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">Rate Card vs Billed</th>
                       <th className="px-4 py-3 whitespace-nowrap bg-emerald-500/5">
                         <div className="flex items-center gap-1">
                           <span>Delivery Fee</span>
@@ -3635,6 +3742,44 @@ Thank you for trusting *Laundry Basket*. ❤️
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
                               <span className="text-xs font-black text-emerald-800 tracking-tight">₹{orderTotal.toLocaleString('en-IN')}</span>
+                            </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
+                              {(() => {
+                                const analysis = computeOrderRateAnalysis(o, rates);
+                                return (
+                                  <div className="flex flex-col gap-0.5 min-w-[130px]">
+                                    <div className="flex items-baseline justify-between gap-1 text-[10px]">
+                                      <span className="text-[8.5px] font-bold text-text-secondary uppercase">Rate Card:</span>
+                                      <span className="font-bold text-slate-700">₹{analysis.maxPossible}</span>
+                                    </div>
+                                    <div className="flex items-baseline justify-between gap-1 text-[10px]">
+                                      <span className="text-[8.5px] font-bold text-text-secondary uppercase">Billed:</span>
+                                      <span className="font-black text-primary">₹{orderTotal}</span>
+                                    </div>
+                                    <div>
+                                      {analysis.variance === 0 ? (
+                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-800 border border-emerald-500/20">
+                                          ✅ Full Rate Card
+                                        </span>
+                                      ) : analysis.variance > 0 ? (
+                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-amber-500/15 text-amber-800 border border-amber-500/20">
+                                          ⚠️ Gap: -₹{analysis.variance} (-{analysis.variancePct}%)
+                                        </span>
+                                      ) : (
+                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-blue-500/15 text-blue-800 border border-blue-500/20">
+                                          🔥 Premium: +₹{Math.abs(analysis.variance)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => setRateBreakdownOrder(o)}
+                                      className="text-[8.5px] font-black text-primary hover:underline text-left mt-0.5 cursor-pointer flex items-center gap-0.5"
+                                    >
+                                      <span>🔍 View Exact Rates</span>
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap bg-emerald-500/[0.02]">
                               <div className="flex flex-col gap-0.5 items-start">
