@@ -304,6 +304,88 @@ const EarningsTrendGraph = ({ data }: { data: { date: string; amount: number; co
   );
 };
 
+// Date Utilities for Date-based Filtering & Operations
+const padZero = (n: number | string) => String(n).padStart(2, '0');
+
+const getTodayKolkataIso = () => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch (_) {
+    const now = new Date();
+    return `${now.getFullYear()}-${padZero(now.getMonth() + 1)}-${padZero(now.getDate())}`;
+  }
+};
+
+const shiftIsoDate = (iso: string, days: number) => {
+  try {
+    const [y, m, d] = (iso || getTodayKolkataIso()).split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return `${dt.getFullYear()}-${padZero(dt.getMonth() + 1)}-${padZero(dt.getDate())}`;
+  } catch (_) {
+    return iso;
+  }
+};
+
+const formatIsoToDisplay = (iso: string) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const formatIsoToLong = (iso: string) => {
+  if (!iso) return '';
+  try {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (_) {
+    return iso;
+  }
+};
+
+const isOrderOnDate = (o: any, targetIso: string) => {
+  if (!targetIso) return true;
+  const [y, m, d] = targetIso.split('-');
+  if (!y || !m || !d) return true;
+  const dInt = parseInt(d, 10);
+  const mInt = parseInt(m, 10);
+
+  const patterns = [
+    targetIso,
+    `${d}/${m}/${y}`,
+    `${dInt}/${mInt}/${y}`,
+    `${d}-${m}-${y}`,
+    `${m}/${d}/${y}`,
+  ];
+
+  const fields = [
+    String(o.timestamp || ''),
+    String(o.order_date || ''),
+    String(o.date || ''),
+    String(o.received_date || '')
+  ];
+
+  for (const f of fields) {
+    if (!f) continue;
+    for (const p of patterns) {
+      if (f.includes(p)) return true;
+    }
+  }
+
+  if (o.timestamp || o.createdAt) {
+    try {
+      const dt = new Date(o.createdAt || o.timestamp);
+      if (!isNaN(dt.getTime())) {
+        const iso = dt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        if (iso === targetIso) return true;
+      }
+    } catch (_) {}
+  }
+
+  return false;
+};
+
 export default function ManagerPanel() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -347,6 +429,19 @@ export default function ManagerPanel() {
   const [isExportingEODPdf, setIsExportingEODPdf] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [selectedDailyDate, setSelectedDailyDate] = useState<string>(() => getTodayKolkataIso());
+
+  const changeDailyDateBy = (days: number) => {
+    setSelectedDailyDate(prev => shiftIsoDate(prev || getTodayKolkataIso(), days));
+  };
+
+  const jumpToToday = () => {
+    setSelectedDailyDate(getTodayKolkataIso());
+  };
+
+  const jumpToYesterday = () => {
+    setSelectedDailyDate(shiftIsoDate(getTodayKolkataIso(), -1));
+  };
   const [editOrderForm, setEditOrderForm] = useState<any>({
     id: '',
     name: '',
@@ -978,30 +1073,36 @@ export default function ManagerPanel() {
     } catch (err) { alert("Export failed"); }
   };
 
-  const exportTodayExcel = () => {
+  const exportDailyOrdersExcel = (targetIso: string = selectedDailyDate) => {
     try {
-      const todayOrders = orders.filter(o => o.timestamp && o.timestamp.includes(new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })));
+      const targetOrders = orders.filter(o => isOrderOnDate(o, targetIso));
+      const dispDate = formatIsoToDisplay(targetIso);
 
-      const data = todayOrders.map(order => ({
-        'Order ID': order.id,
-        'Date': order.timestamp,
-        'Customer Name': order.name,
-        'Phone': order.phone,
-        'Address': order.address,
-        'Services': Array.isArray(order.services) ? order.services.join(', ') : order.services,
-        'Total Amount': order.total,
-        'Status': order.status
+      const data = targetOrders.map(order => ({
+        'Order ID': order.id || order.customer_id,
+        'Date': order.timestamp || order.order_date || dispDate,
+        'Customer Name': order.name || order.customer_name || '-',
+        'Phone': order.phone || order.mobile_number || '-',
+        'Address': order.address || '-',
+        'Services': Array.isArray(order.services) ? order.services.join(', ') : order.services || '-',
+        'Total Amount (₹)': Number(order.total) || 0,
+        'Payment Status': order.paymentStatus || order.payment_status || 'Pending',
+        'Payment Mode': order.paymentMode || order.payment_mode || '-',
+        'Order Status': order.status || 'Pending'
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Today Orders");
-      XLSX.writeFile(wb, `Todays_Orders_${storeId}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const isToday = targetIso === getTodayKolkataIso();
+      const sheetName = isToday ? "Today Orders" : `Orders ${dispDate.replace(/\//g, '-')}`;
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, `Orders_${storeId}_${targetIso}.xlsx`);
     } catch (err) {
       alert("Failed to export Excel.");
       console.error(err);
     }
   };
+  const exportTodayExcel = () => exportDailyOrdersExcel(selectedDailyDate);
 
   const exportInventoryExcel = () => {
     try {
@@ -1163,7 +1264,7 @@ export default function ManagerPanel() {
         format: [pdfWidth, pdfHeight]
       });
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`EOD_Report_Graph_${storeId}_${todayIsoStr}.pdf`);
+      pdf.save(`EOD_Report_Graph_${storeId}_${selectedDailyDate}.pdf`);
     } catch (e: any) {
       alert('Error generating EOD Graph PDF: ' + (e?.message || String(e)));
     } finally {
@@ -1173,15 +1274,11 @@ export default function ManagerPanel() {
 
   const exportEODReport = () => {
     try {
-      const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-      const todayIsoStr = new Date().toISOString().split('T')[0];
+      const reportDateStr = formatIsoToDisplay(selectedDailyDate);
+      const reportIsoStr = selectedDailyDate;
 
-      // Filter today's orders by timestamp, order_date, or received_date
-      const todayOrders = orders.filter(o => {
-        const ts = String(o.timestamp || o.order_date || '');
-        const rcDate = String(o.received_date || '');
-        return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
-      });
+      // Filter orders by selected date
+      const todayOrders = orders.filter(o => isOrderOnDate(o, selectedDailyDate));
 
       // Compute EOD stats
       const totalOrders = todayOrders.length;
@@ -1244,10 +1341,10 @@ export default function ManagerPanel() {
       const summaryData = [
         { 'Metric': 'Store Name', 'Value': storeName },
         { 'Metric': 'Store ID', 'Value': storeId },
-        { 'Metric': 'Report Date', 'Value': todayDateStr },
+        { 'Metric': 'Report Date', 'Value': reportDateStr },
         { 'Metric': 'Generated At', 'Value': new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) },
         { 'Metric': '-------------------------', 'Value': '-------------------------' },
-        { 'Metric': 'Total Orders Today', 'Value': totalOrders },
+        { 'Metric': 'Total Orders', 'Value': totalOrders },
         { 'Metric': 'Orders Delivered / Completed', 'Value': deliveredCount },
         { 'Metric': 'Orders In Process', 'Value': inProcessCount },
         { 'Metric': 'Orders Pending / Pickup', 'Value': pendingCount },
@@ -1292,9 +1389,10 @@ export default function ManagerPanel() {
       const wsOrders = XLSX.utils.json_to_sheet(ordersData);
 
       XLSX.utils.book_append_sheet(wb, wsSummary, "EOD Summary");
-      XLSX.utils.book_append_sheet(wb, wsOrders, "Today's Orders Detail");
+      const isToday = selectedDailyDate === getTodayKolkataIso();
+      XLSX.utils.book_append_sheet(wb, wsOrders, isToday ? "Today's Orders Detail" : `Orders (${reportDateStr.replace(/\//g, '-')})`);
 
-      XLSX.writeFile(wb, `EOD_Report_${storeId}_${todayIsoStr}.xlsx`);
+      XLSX.writeFile(wb, `EOD_Report_${storeId}_${reportIsoStr}.xlsx`);
     } catch (err) {
       alert("Failed to export EOD Report.");
       console.error(err);
@@ -3798,15 +3896,16 @@ Thank you for trusting *Laundry Basket*. ❤️
           )}
 
           {activeTab === 'today' && (() => {
-            const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-            const todayIsoStr = new Date().toISOString().split('T')[0];
+            const todayIso = getTodayKolkataIso();
+            const isTodaySelected = selectedDailyDate === todayIso;
+            const yesterdayIso = shiftIsoDate(todayIso, -1);
+            const isYesterdaySelected = selectedDailyDate === yesterdayIso;
+            
+            const displayDateStr = formatIsoToDisplay(selectedDailyDate);
+            const formattedLongDate = formatIsoToLong(selectedDailyDate);
 
-            // Orders placed today OR orders where payment was received today
-            const todayOrdersList = orders.filter((o: any) => {
-              const ts = String(o.timestamp || o.order_date || '');
-              const rcDate = String(o.received_date || '');
-              return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
-            });
+            // Filter orders for the selected date
+            const todayOrdersList = orders.filter((o: any) => isOrderOnDate(o, selectedDailyDate));
 
             const totalOrdersCount = todayOrdersList.length;
             const totalRevenueToday = todayOrdersList.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
@@ -3827,10 +3926,16 @@ Thank you for trusting *Laundry Basket*. ❤️
 
             return (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
                   <div>
-                    <h3 className="text-4xl font-black tracking-tight">Today's Orders</h3>
-                    <p className="text-text-secondary text-sm mt-1">Orders & payments for today ({todayDateStr})</p>
+                    <h3 className="text-4xl font-black tracking-tight">
+                      {isTodaySelected ? "Today's Orders" : `Orders for ${displayDateStr}`}
+                    </h3>
+                    <p className="text-text-secondary text-sm mt-1">
+                      {isTodaySelected 
+                        ? `Orders & payments for today (${displayDateStr})` 
+                        : `Orders & payments for ${formattedLongDate}`}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <button
@@ -3849,22 +3954,110 @@ Thank you for trusting *Laundry Basket*. ❤️
                   </div>
                 </div>
 
+                {/* Interactive Date Filter Bar */}
+                <div className="glass p-3.5 rounded-3xl border border-black/5 bg-white/70 shadow-sm flex flex-wrap items-center justify-between gap-3 mb-6">
+                  {/* Left: Quick Date Navigation & Calendar Picker */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center bg-black/5 p-1 rounded-2xl">
+                      <button
+                        onClick={() => changeDailyDateBy(-1)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                        title="View previous day"
+                      >
+                        <span>◀</span> Prev Day
+                      </button>
+                      
+                      <div className="relative flex items-center mx-1.5">
+                        <input
+                          type="date"
+                          value={selectedDailyDate}
+                          onChange={(e) => {
+                            if (e.target.value) setSelectedDailyDate(e.target.value);
+                          }}
+                          className="bg-white border border-black/10 text-text-primary px-3 py-1.5 rounded-xl text-xs font-black outline-none focus:border-primary shadow-sm cursor-pointer"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => changeDailyDateBy(1)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black text-text-secondary hover:text-primary hover:bg-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                        title="View next day"
+                      >
+                        Next Day <span>▶</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Presets: Today & Yesterday */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={jumpToToday}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                          isTodaySelected
+                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
+                            : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={jumpToYesterday}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                          isYesterdaySelected
+                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/25 scale-105'
+                            : 'bg-white/80 border-black/10 text-text-secondary hover:text-primary hover:bg-white'
+                        }`}
+                      >
+                        Yesterday
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right: Date Status Indicator & Reset */}
+                  <div className="flex items-center gap-2">
+                    {isTodaySelected ? (
+                      <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-800 border border-emerald-500/25 flex items-center gap-2 shadow-sm">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Live Today ({displayDateStr})
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="px-3.5 py-2 rounded-2xl text-[11px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-800 border border-blue-500/25 flex items-center gap-2 shadow-sm">
+                          <span>📅</span>
+                          Selected: {formattedLongDate}
+                        </span>
+                        <button
+                          onClick={jumpToToday}
+                          className="px-3 py-1.5 rounded-xl text-xs font-black text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer"
+                        >
+                          Back to Today
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* 3 KPI Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
                   {/* Card 1: Today's Orders / Total Booked */}
                   <div className="glass p-6 rounded-3xl border border-primary/20 bg-primary/5 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-primary tracking-widest">Today's Total Booked</p>
+                      <p className="text-[11px] font-black uppercase text-primary tracking-widest">
+                        {isTodaySelected ? "Today's Total Booked" : "Total Booked"}
+                      </p>
                       <span className="text-xl">📦</span>
                     </div>
                     <p className="text-3xl font-black text-text-primary">₹{totalRevenueToday}</p>
-                    <p className="text-xs text-text-secondary font-medium mt-1">{totalOrdersCount} orders placed today</p>
+                    <p className="text-xs text-text-secondary font-medium mt-1">
+                      {totalOrdersCount} orders placed {isTodaySelected ? 'today' : `on ${displayDateStr}`}
+                    </p>
                   </div>
 
                   {/* Card 2: Today's Received Amount */}
                   <div className="glass p-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-emerald-700 tracking-widest">Today's Received Amount</p>
+                      <p className="text-[11px] font-black uppercase text-emerald-700 tracking-widest">
+                        {isTodaySelected ? "Today's Received Amount" : "Received Amount"}
+                      </p>
                       <span className="text-xl">💰</span>
                     </div>
                     <p className="text-3xl font-black text-emerald-800">₹{totalReceivedToday}</p>
@@ -3881,11 +4074,15 @@ Thank you for trusting *Laundry Basket*. ❤️
                   {/* Card 3: Today's Pending Collection */}
                   <div className="glass p-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black uppercase text-amber-700 tracking-widest">Today's Pending Collection</p>
+                      <p className="text-[11px] font-black uppercase text-amber-700 tracking-widest">
+                        {isTodaySelected ? "Today's Pending Collection" : "Pending Collection"}
+                      </p>
                       <span className="text-xl">⏳</span>
                     </div>
                     <p className="text-3xl font-black text-amber-800">₹{pendingRevenueToday}</p>
-                    <p className="text-xs text-amber-700/80 font-medium mt-1">{pendingOrdersCount} orders pending payment</p>
+                    <p className="text-xs text-amber-700/80 font-medium mt-1">
+                      {pendingOrdersCount} orders pending payment
+                    </p>
                   </div>
                 </div>
 
@@ -3983,7 +4180,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                         })}
                         {!loading && todayOrdersList.length === 0 && (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-text-secondary text-sm font-medium">No orders recorded for today yet.</td>
+                            <td colSpan={8} className="p-8 text-center text-text-secondary text-sm font-medium">No orders recorded for {displayDateStr}.</td>
                           </tr>
                         )}
                       </tbody>
@@ -5916,15 +6113,11 @@ Thank you for trusting *Laundry Basket*. ❤️
 
         {/* EOD Report with Graphs Modal */}
         {showEODModal && (() => {
-          const todayDateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-          const todayIsoStr = new Date().toISOString().split('T')[0];
+          const reportDateStr = formatIsoToDisplay(selectedDailyDate);
+          const isToday = selectedDailyDate === getTodayKolkataIso();
 
-          // Filter today's orders by timestamp, order_date, or received_date
-          const todayOrders = orders.filter(o => {
-            const ts = String(o.timestamp || o.order_date || '');
-            const rcDate = String(o.received_date || '');
-            return ts.includes(todayDateStr) || ts.includes(todayIsoStr) || rcDate === todayDateStr;
-          });
+          // Filter orders by selected date
+          const todayOrders = orders.filter(o => isOrderOnDate(o, selectedDailyDate));
 
           const totalOrders = todayOrders.length;
           const totalRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
@@ -6056,7 +6249,18 @@ Thank you for trusting *Laundry Basket*. ❤️
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center bg-slate-800 border border-slate-700 px-2.5 py-1.5 rounded-xl">
+                      <span className="text-[10px] font-bold text-slate-400 mr-2 uppercase">Date:</span>
+                      <input
+                        type="date"
+                        value={selectedDailyDate}
+                        onChange={(e) => {
+                          if (e.target.value) setSelectedDailyDate(e.target.value);
+                        }}
+                        className="bg-slate-900 border border-slate-700 text-white px-2 py-1 rounded-lg text-xs font-bold outline-none cursor-pointer"
+                      />
+                    </div>
                     <button
                       onClick={exportEODGraphPDF}
                       disabled={isExportingEODPdf}
@@ -6098,7 +6302,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Report Date</p>
-                      <p className="text-xl font-black text-slate-900">{todayDateStr}</p>
+                      <p className="text-xl font-black text-slate-900">{reportDateStr}</p>
                       <p className="text-[10px] font-semibold text-slate-500">Generated at {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
                     </div>
                   </div>
@@ -6106,7 +6310,7 @@ Thank you for trusting *Laundry Basket*. ❤️
                   {/* KPI Executive Summary Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Sales Today</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">{isToday ? "Total Sales Today" : "Total Sales on Date"}</p>
                       <p className="text-2xl font-black text-blue-600 mt-1">₹{totalRevenue.toLocaleString('en-IN')}</p>
                       <p className="text-[10px] font-bold text-slate-500 mt-1">{totalOrders} orders booked</p>
                     </div>
